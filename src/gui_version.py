@@ -1,267 +1,350 @@
+from tkinter.constants import BOTTOM
 import numpy as np
 
-class ActivationFunctions:
-        
-
-    def unipolar(data,derivative = False):
-        return ActivationFunctions.Sigmoid(data,derivative )
-    
-    def bipolar(data,derivative = False):
-        return ActivationFunctions.arctg(data,derivative)
-    
-    def Sigmoid(data,derivative = False):
-        if derivative:
-                   
-            return (1-data)*data
-        
-        temp = np.array(data)
-        return 1.0/(1.0+np.exp(-temp))
-    
-        
-    def arctg(data,derivative = False):
-        if derivative:
-            return 1-(data*data)     
-
-        return -(1.0-np.exp(np.array(data)))/(1.0+np.exp(np.array(data)))
-    
-    
-    
-    
-    def Default(data,derivative=False):
-        return ActivationFunctions.unipolar(data,derivative)
-
-class LossFunctions:
-    
-    def Default(estimator,goal,derivative=False):
-        return LossFunctions.AE(estimator,goal,derivative)
-    def AE(estimator,goal,derivative=False):
-        
-        if derivative:
-            return estimator-goal
-        return np.power((estimator-goal),2)/2
-        
-        
-
-class Layer:
-    
-    def __init__(self,shape,function=ActivationFunctions.Default) -> None:
-        assert len(shape)==2
-        assert isinstance(shape[0],int) and isinstance(shape[1],int)
-        assert shape[0]>0 and shape[1]>0
-        self.function=function
-        self.shape = shape
-
-        self._init_matrix()
-        self.output=None
-        self.input=None
-
-    def __init__(self,shape_x:int,shape_y:int,function=ActivationFunctions.Default) -> None:
-        assert shape_y>0 and shape_x>0
-
-        self.shape = (shape_x,shape_y)
-        self.function=function
-        self._init_matrix()
-        self.output=None
-        self.input=None
-
-    def _init_matrix(self):
-        self.matrix = (np.random.randn(self.shape[0],self.shape[1]))
-        self.bias=np.random.randn(self.shape[1])
-
-
-    def forward(self,data,function=None):
-        
-        if function in [None]:
-            function = self.function
-
-        self.input=data.copy()
-        temp=np.dot(data,self.matrix)
-        temp_shape = temp.shape
-        
-        self.dot = np.reshape(temp.copy()-self.bias,temp_shape)
-
-#             print(self.dot,"####",)
-        self.output = function(self.dot)
-        return self.output.copy()
-    
-    
-    
-    
-    
-    
-performance = []
-class Model:
-
-    def __init__(self):
-        self.layers=[] # tymczasowe wartości, które potem są wykorzystywne do kompilacji modelu
-        self.structure=[] # zbiór obiektów Layer
-        self.learningFactor=0.2
-        self.dataset={}
-        self.loss_v=None
-        self.iterations = 100
-    def addLayer(self,numberOfNeurons:int,function=ActivationFunctions.Default):
-        assert numberOfNeurons>0
-        # TODO to validate function
-        self.layers.append((numberOfNeurons,function))
-        
-    def compileModel(self):
-        assert len(self.layers)>=2
-        self.structure=[]
-        for i in range(len(self.layers)-1):
-            self.structure.append(Layer(self.layers[i][0],self.layers[i+1][0],self.layers[i+1][1]))
-            
-    def forward(self,data):
-        assert len(self.structure) >=1
-        output = data
-        for i in self.structure:
-            output = i.forward(output)#.copy()
-        return output#.copy()
-    
-    def upload_test_dataset(self,data): #TODO add validation
-        self.dataset['test'] = data
-        
-    def upload_train_dataset(self,data): #TODO add validation
-        self.dataset['train'] = data
-    
-    def loss(self,goal,function=ActivationFunctions.Default):
-        return function(self.structure[-1].output,goal)
-    
-    def evaluate(self):
-        suma = 0.0
-        for x,y in zip(self.dataset['train']['egzo'],self.dataset['train']['endo']):
-            temp = (self.forward(x)-y)
-            temp *= temp
-            suma +=temp
-        return suma
-        
-    def SGD(self,x,y):
-        out = x
-        for i in range(len(self.structure)):
-            out = self.structure[i].forward(out)
-        self.loss_v=self.loss(y,LossFunctions.AE)
-
-        nabla_w = [0]*len(self.structure)
-        nabla_b = [0]*len(self.structure)
-
-        delta = LossFunctions.AE(self.structure[-1].output,y,derivative=True) \
-                * self.structure[-1].function(self.structure[-1].output,derivative=True)
-        
-        self.structure[-1].input = np.expand_dims(self.structure[-1].input, axis=1)
-        
-        delta = np.expand_dims(delta, axis=1) 
-        nabla_b[-1] = delta.copy()
-        nabla_w[-1]= np.dot( self.structure[-1].input,delta.T)
-        
-        
-        for l in range(2,len(self.structure)+1):
-            
-            z=None
-            
-            sp=self.structure[-l].function(self.structure[-l].output,derivative=True)
-
-            delta = np.dot(delta,self.structure[-l+1].matrix.T)*sp
-            nabla_b[-l] = delta.copy()
-
-            self.structure[-l].input = np.expand_dims(self.structure[-l].input, axis=1)
-
-            nabla_w[-l] = np.dot(self.structure[-l].input,delta)
-
-        return nabla_w , nabla_b
-
-    def train(self):
-        global performance
-        
-        counter = self.iterations
-        while counter>=0:
-            counter-=1
-
-            arr = None
-            for x,y in zip(self.dataset['train']['egzo'],self.dataset['train']['endo']):
-
-                nabla_w, nabla_b = self.SGD(x,y)
-                
-                for i  in range(len(self.structure)):
-
-                    self.structure[i].matrix = self.structure[i].matrix - np.multiply(self.learningFactor,nabla_w[i])
-                    
-                   
-                    temp_shape=self.structure[i].bias.shape
-                    
-                    self.structure[i].bias = self.structure[i].bias + np.multiply(self.learningFactor,nabla_b[i])
-            performance.append(self.evaluate())
-            
-                    
-                    
-
-    
-performance = []
-model = Model()
-
-model.addLayer(4,ActivationFunctions.bipolar)
-model.addLayer(4,ActivationFunctions.bipolar)
-model.addLayer(1,ActivationFunctions.bipolar)
-
-
-model.compileModel()
-
-train_dataset= {
-    'egzo': np.array([[1,1,0,0],[1,0,0,0],[1,1,1,1]]), 
-    'endo':np.array([ [1],      [0],      [0.5]])
-}
-
-
-model.upload_train_dataset(train_dataset)
-print(model.forward([1,0,0,0]))
-print(model.forward([1,1,0,0]))
-print(model.forward([1,1,1,1]))
-
-one=model.train()
-one
-
-
-print("0         ",model.forward([1,0,0,0]))
-print("1         ",model.forward([1,1,0,0]))
-print("0.5       ",model.forward([1,1,1,1]),end="\n\n")
-print("evaluate: ",model.evaluate())
-
+from NN import *
+import json
+import tkinter as tk
+import tkinter.messagebox as tkmsg
 
 import matplotlib.pyplot as plt
-plt.plot(performance)
-plt.show()
-np.min(performance)
+from tkinter.filedialog import askopenfilename
 
-import tkinter as tk
 
-def blablabla(foo):
-    print("kocham krzysia <",foo)
+
+
+
+DEBUG = True
+
 class GUI:
     
     class MainWindowC:
         def __init__(self):
             self.main = tk.Tk()
+            self.model = Model()
+            self.ModelBiasState = True
+            self.NameOfFile = None
+            self.DataJsonRaw = {}
+            self.modelEvaluationTrain = []
+            self.modelEvaluationTest = []
+
+            self.topFrame = tk.Frame(self.main)
+            self.topFrame.pack()
+
+            self.bottomFrame = tk.Frame(self.main)
+            self.bottomFrame.pack(side=BOTTOM)
             
             self.main.geometry("1000x800")
             self.create_widgets()
             
             self.main.mainloop()
+
+            
         def create_widgets(self):
             
-            self.labelTitle = tk.Label(self.main,text="NNFS")
+            self.labelTitle = tk.Label(self.topFrame,text="NNFS")
             self.labelTitle.config(font=("FreeSans",30))
             self.labelTitle.grid(row=0,column=0)
-            
-            
-            self.buttonQuit = tk.Button(self.main, text="213", )
-            self.buttonQuit.grid(row=0,column=1,padx=20)
+            padx = 3
+            temp_col = 1
 
-            self.buttontest = tk.Button(self.main, text="foo", )
-            self.buttontest.grid(row=0,column=2,padx=20)
+            self.buttonImportDataFromFile = tk.Button(self.topFrame, text="Import Data From File", command=self.ImportDataFromFile)
+            self.buttonImportDataFromFile.grid(row=0,column=temp_col,padx=padx)
+            temp_col+=1
+
+            self.buttonCreateLayer = tk.Button(self.topFrame, text="Create layer", command=self.CreateNewLayer)
+            self.buttonCreateLayer.grid(row=0,column=temp_col,padx=padx)
+            temp_col+=1
+
+            self.buttonCompileNetwork = tk.Button(self.topFrame, text="Compile Network", command= self.CompileNetwork)
+            self.buttonCompileNetwork.grid(row=0,column=temp_col,padx=padx)
+            temp_col+=1
+
+            self.buttonTrainNetwork = tk.Button(self.topFrame, text="Train Network", command= self.TrainNetwork)
+            self.buttonTrainNetwork.grid(row=0,column=temp_col,padx=padx)
+            temp_col+=1
+            
+            self.buttonSettings = tk.Button(self.topFrame, text="Settings", command=self.Settings)
+            self.buttonSettings.grid(row=0,column=temp_col,padx=padx)
+            temp_col+=1
+
+            self.buttonEvaluate = tk.Button(self.topFrame, text="Evaluate")
+            self.buttonEvaluate.grid(row=0,column=temp_col,padx=padx)
+            temp_col+=1
+
+            self.buttonTrainStatistics = tk.Button(self.topFrame, text="Train Statistics",command=self.TrainStatistics)
+            self.buttonTrainStatistics.grid(row=0,column=temp_col,padx=padx)
+            temp_col+=1
+            
+            del(temp_col)
+
+            self.LabelDEBUG = tk.Label(self.bottomFrame, text="EMPTY")
+            self.LabelDEBUG.grid(row=0,column=0,padx=padx)
+
+            self.buttonImportFromFile = tk.Button(self.bottomFrame, text="TE                EST", command=self.DEBUG_helper)
+            self.buttonImportFromFile.grid(row=1,column=0,padx=padx)
+            
+        def DEBUG_helper(self):
+            value = "self.model.layers"+ str(self.model.layers)+"\n"
+            value += "self.model.structure"+str(self.model.structure)+"\n"
+            value += "\n Layers:\n"
+            for i in self.model.structure:
+                value += str(i.matrix.shape)+"\n"
+
+            value += "Dataset: "+ str(self.model.dataset)+"\n"
+            self.LabelDEBUG["text"] = value
+
+
+        #####
+        def TrainStatistics(self):
+            self.TrainStatisticsTopLevel = tk.Toplevel()
+            if False and  DEBUG and( not len(self.modelEvaluationTrain)==0 or not len(self.modelEvaluationTest)==0):
+                self.modelEvaluationTrain = np.linspace(0,1,100)
+                self.modelEvaluationTest = np.linspace(-1,3,100)
+            
+            if self.modelEvaluationTest is None or len(self.modelEvaluationTest) == 0 or self.modelEvaluationTrain is  None or len(self.modelEvaluationTrain) == 0:
+                tkmsg.showinfo("Cannot calculate statistics","Model is not trained or initailized, so it's imposible to calculate values and make charts!")
+                return
+            print("###")
+            #self.TrainStatisticsLabel
+            temp_row=1
+            self.TrainStatisticsLabelMainText = tk.Label(self.TrainStatisticsTopLevel,text = "Basic statistics form network training:")
+            self.TrainStatisticsLabelMainText.grid(column=1,row=temp_row)
+            temp_row+=1
+
+            self.TrainStatisticsLabelMinTrainError = tk.Label(self.TrainStatisticsTopLevel,text = "Minimum Train Error: "+str(np.min(self.modelEvaluationTrain)))
+            self.TrainStatisticsLabelMinTrainError.grid(column=1,row=temp_row)
+            temp_row+=1
+
+            self.TrainStatisticsLabelAverageTrainError = tk.Label(self.TrainStatisticsTopLevel,text = "Average Train Error: "+str(np.average(self.modelEvaluationTrain)))
+            self.TrainStatisticsLabelAverageTrainError.grid(column=1,row=temp_row)
+            temp_row+=1
+
+            self.TrainStatisticsLabelMaxTrainError = tk.Label(self.TrainStatisticsTopLevel,text = "Maximum Train Error: "+str(np.max(self.modelEvaluationTrain)))
+            self.TrainStatisticsLabelMaxTrainError.grid(column=1,row=temp_row)
+            temp_row+=1
+
             
 
+            self.TrainStatisticsButtonErrorPlotShow = tk.Button(self.TrainStatisticsTopLevel,text = "Interactive error plot",command=self.ErrorPlotShow)
+            self.TrainStatisticsButtonErrorPlotShow.grid(column=1,row=temp_row)
+            temp_row+=1
+
+            del(temp_row)
+
+
+           
+
+            
+
+        def ErrorPlotShow(self):
+            plt.plot(self.modelEvaluationTrain)
+            plt.plot(self.modelEvaluationTest)
+            plt.show()
+
+
+
+        def ImportDataFromFile(self):
+            nameoffile = self.ImportDataFromFileAskForFilePath()
+            if nameoffile == ():
+                #tkmsg.showwarning("File not selected", "File was not selected. Please select file to import data!")
+                return
+            if nameoffile.split('.')[-1] == 'json':
+                
+                try:
+                    with open(nameoffile ) as file:
+                        self.DataJsonRaw=json.load(file)
+                except Exception as ex:
+                    print(ex)
+                    tkmsg.showerror("Wrong file format", "File format corrupteed! Cannot parse data!")
+                    return
+            else:
+                tkmsg.showerror("Wrong file extention", "Unrecognized file extention!")
+                return
+
+            if not self.ImportDataFromFilecheckDataFormatIsOk():
+                tkmsg.showerror("Data wrong format!", "Data read form file is in wrong format!")
+                return 
+            else:
+                self.DataChecked = dict(self.DataJsonRaw)
+                self.model.dataset = dict(self.DataChecked)
+                
+        def ImportDataFromFilecheckDataFormatIsOk(self):
+            if not isinstance(self.DataJsonRaw,dict) or (not 'train' in self.DataJsonRaw.keys()) or (not 'test' in self.DataJsonRaw.keys())\
+                or (not "egzo" in self.DataJsonRaw['train'].keys()) or (not "endo" in self.DataJsonRaw['train'].keys()) or (not "egzo" in self.DataJsonRaw['test'].keys())\
+                or (not "endo" in self.DataJsonRaw['test'].keys()) or len(self.DataJsonRaw['train']['egzo'])!= len(self.DataJsonRaw['train']['endo'])\
+                or (len(self.DataJsonRaw['test']['egzo'])!= len(self.DataJsonRaw['test']['endo'])):
+                return False
+            return True
+                
+
+        def ImportDataFromFileAskForFilePath(self):
+            return askopenfilename() 
+
+        def CreateNewLayer(self):
+            self.CreateNewLayerTopLevel = tk.Toplevel()
+            # self.CreateNewLayerTopLevel.geometry("400x150")
+
+
+
+            self.CreateNewLayerLabelNumberOfNeurons = tk.Label(self.CreateNewLayerTopLevel,text="Number of neurons: ")
+            self.CreateNewLayerLabelNumberOfNeurons.config(font=("FreeSans",16))
+            self.CreateNewLayerLabelNumberOfNeurons.grid(row=1,column=1, columnspan=2)
+
+
+            #entry
+
+            self.CreateNewLayerInputNumberOfNeurons = tk.Entry(self.CreateNewLayerTopLevel,width=20)
+            self.CreateNewLayerInputNumberOfNeurons.grid(row=2,column=1, columnspan=2)
+
+
+            #radiobuttons
+            self.CreateNewLayerActivationFuncitonVariable=tk.IntVar()
+            self.CreateNewLayerActivationFuncitonVariable.set(1)
+
+            self.CreateNewLayerRadioButtonUnipolar = tk.Radiobutton(self.CreateNewLayerTopLevel, text="Sigmoid (Unipolar)",variable = self.CreateNewLayerActivationFuncitonVariable, value=1)
+            self.CreateNewLayerRadioButtonUnipolar.grid(row=3,column=1, columnspan=2, sticky="W")
+
+
+            self.CreateNewLayerRadioButtonBipolar = tk.Radiobutton(self.CreateNewLayerTopLevel, text="ArcTG (Bipolar)",variable = self.CreateNewLayerActivationFuncitonVariable, value=2)
+            self.CreateNewLayerRadioButtonBipolar.grid(row=4,column=1, columnspan=2, sticky="W")
+
+
+
+            self.CreateNewLayerButtonSubmit = tk.Button(self.CreateNewLayerTopLevel,text="Submit",command=self.CreateNewLayerReadFieldsAndExit)
+            self.CreateNewLayerButtonSubmit.grid(row=5,column=2 )
+            
+            self.CreateNewLayerButtonCancel = tk.Button(self.CreateNewLayerTopLevel,text="Cancel",command=self.CreateNewLayerTopLevel.destroy)
+            self.CreateNewLayerButtonCancel.grid(row=5,column=1 )
+
+
+
+        def CreateNewLayerReadFieldsAndExit(self):
+            #validate input, raise messagebox to warn user to type correct input
+            temp_AF = self.CreateNewLayerActivationFuncitonVariable.get() 
+            print("activaton: ",self.CreateNewLayerActivationFuncitonVariable.get())
+            print("Number of neurons",self.CreateNewLayerInputNumberOfNeurons.get())
+            try:
+                self.CreateNewLayerNumberOfNeurons = int(self.CreateNewLayerInputNumberOfNeurons.get())
+                assert self.CreateNewLayerNumberOfNeurons >=1
+                assert self.CreateNewLayerNumberOfNeurons <=250
+                
+                if temp_AF == 1:
+                    temp_AF = ActivationFunctions.unipolar
+                else:
+                    temp_AF = ActivationFunctions.bipolar
+                self.model.addLayer(self.CreateNewLayerNumberOfNeurons,temp_AF)
+                del(temp_AF)
+                self.CreateNewLayerTopLevel.destroy()
+            except Exception :
+                tkmsg.showerror("Invalid Input!",'Please make sure, number of neurons in this layer is correct!')
+                return 
+        
+        def TrainNetworkMonitor(self,iteration:int = None,wholeError_train:float=0.0,wholeError_test:float=0.0,correction = None):
+            self.modelEvaluationTrain.append(wholeError_train)
+            self.modelEvaluationTest.append(wholeError_test)
+
+
+        def TrainNetwork(self):
+            self.modelEvaluationTrain = []
+            self.modelEvaluationTest = []
+            if len(self.model.structure) == 0 or self.model.dataset ==None or self.model.dataset=={} or (not "train" in self.model.dataset.keys()) or (not "train" in self.model.dataset.keys()):
+                tkmsg.showerror("Uninitialized Network", "Please make sure the dataset is imported and network is compiled!")
+                return 
+            self.model.setExternalMonitor(self.TrainNetworkMonitor)
+            # TODO add including monitor
+            self.model.train()
+            tkmsg.showinfo("Model Trained!","Model is trained!")
+            
+
+
+        def CompileNetwork(self):
+            if not len(self.model.layers)>=2:
+                tkmsg.showerror("Too few layers!", "Network requiers at least 2 layers, input and output. Please add them!")
+                return
+            self.model.compileModel()
+            if DEBUG:
+                tkmsg.showinfo("compiled!","Model was compiled!")
+        def Settings(self):
+            self.SettingsTopLevel = tk.Toplevel()
+            
+            self.SettingsLabelMainText = tk.Label(self.SettingsTopLevel,text = "Settings: ")
+            self.SettingsLabelMainText.grid(row=1,column=1,sticky="W", columnspan=2)
+
+
+            self.SettingsCheckBoxBiasVar = tk.IntVar()
+            self.SettingsCheckBoxBiasVar.set(1 if self.ModelBiasState else 0)
+            
+            self.SettingsCheckBoxBias = tk.Checkbutton(self.SettingsTopLevel, text='use Bias',variable=self.SettingsCheckBoxBiasVar, onvalue=1, offvalue=0)
+            self.SettingsCheckBoxBias.grid(row=2,column=1,sticky="W")
+            
+            self.SettingsButtonCancel = tk.Button(self.SettingsTopLevel,text="Cancel",command=self.SettingsTopLevel.destroy)
+            self.SettingsButtonCancel.grid(row=30,column=1 )
+                        #TODO
+            self.SettingsButtonSubmit = tk.Button(self.SettingsTopLevel,text="Submit",command=self.SettingsReadFieldsAndExit)
+            self.SettingsButtonSubmit.grid(row=30,column=2 )
+
+
+
+        def SettingsReadFieldsAndExit(self):
+            if self.SettingsCheckBoxBiasVar.get()==1:
+                self.ModelBiasState = True
+            else: 
+                self.ModelBiasState = False
+            
+            self.model.biasState = self.ModelBiasState
+            self.SettingsTopLevel.destroy()
+
+            
+
+
+            
     
     def __init__(self):
         self.mainWindowO = self.MainWindowC()
 
+if __name__ == "__main__":
+    GUI()
+
+                    
+'''                   
+
+    
+    performance = []
+    model = Model()
+
+    model.addLayer(4,ActivationFunctions.bipolar)
+    model.addLayer(4,ActivationFunctions.bipolar)
+    model.addLayer(1,ActivationFunctions.bipolar)
+
+
+    model.compileModel()
+
+    train_dataset= {
+        'egzo': np.array([[1,1,0,0],[1,0,0,0],[1,1,1,1]]), 
+        'endo':np.array([ [1],      [0],      [0.5]])
+    }
+
+
+    model.upload_train_dataset(train_dataset)
+    print(model.forward([1,0,0,0]))
+    print(model.forward([1,1,0,0]))
+    print(model.forward([1,1,1,1]))
+
+    one=model.train()
+    one
+
+
+    print("0         ",model.forward([1,0,0,0]))
+    print("1         ",model.forward([1,1,0,0]))
+    print("0.5       ",model.forward([1,1,1,1]),end="\n\n")
+    print("evaluate: ",model.evaluate())
+
+
+    import matplotlib.pyplot as plt
+    plt.plot(performance)
+    plt.show()
+    np.min(performance)
 
 
 
+'''
