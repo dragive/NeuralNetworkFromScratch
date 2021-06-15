@@ -1,21 +1,15 @@
 #!/usr/bin/python3
 import numpy as np
 
-class ExceptionCustom(Exception):
-    def __init__(self, *args: object) -> None:
-        super().__init__(*args)
-
 
 class ActivationFunctions:
         
+    def Export(func):
+        return "uni" if func == ActivationFunctions.unipolar or func == ActivationFunctions.Default else 'bi'
+    def Import(name):
+        return ActivationFunctions.bipolar if name == 'bi' else ActivationFunctions.unipolar
 
     def unipolar(data,derivative = False):
-        return ActivationFunctions.Sigmoid(data,derivative )
-    
-    def bipolar(data,derivative = False):
-        return ActivationFunctions.arctg(data,derivative)
-    
-    def Sigmoid(data,derivative = False):
         if derivative:
                    
             return (1-data)*data
@@ -23,21 +17,23 @@ class ActivationFunctions:
         temp = np.array(data)
         return 1.0/(1.0+np.exp(-temp))
     
+    def bipolar(data,derivative = False):
         
-    def arctg(data,derivative = False):
         if derivative:
             return 1-(data*data)     
 
         return -(1.0-np.exp(np.array(data)))/(1.0+np.exp(np.array(data)))
-    
-    
-    
-    
+
     def Default(data,derivative=False):
         return ActivationFunctions.unipolar(data,derivative)
 
 class LossFunctions:
-    
+    def Export(func):
+        return "AE"
+
+    def Import(str):
+        return LossFunctions.AE
+
     def Default(estimator,goal,derivative=False):
         return LossFunctions.AE(estimator,goal,derivative)
     def AE(estimator,goal,derivative=False):
@@ -49,7 +45,8 @@ class LossFunctions:
         
 
 class Layer:
-    
+
+
     def __init__(self,shape,function=ActivationFunctions.Default) -> None:
         assert len(shape)==2
         assert isinstance(shape[0],int) and isinstance(shape[1],int)
@@ -61,6 +58,7 @@ class Layer:
         self.output=None
         self.input=None
 
+   
     def __init__(self,shape_x:int,shape_y:int,function=ActivationFunctions.Default) -> None:
         assert shape_y>0 and shape_x>0
 
@@ -71,13 +69,37 @@ class Layer:
         self.input=None
 
     def _init_matrix(self):
-        self.matrix = (np.random.randn(self.shape[0],self.shape[1]))
-        if 1==1 or not self.biasState:
-            self.bias=np.random.randn(self.shape[1])
-        else:
-            self.bias = np.zeros(self.shape[1])
+        self.matrix = (np.random.randn(self.shape[0],self.shape[1]))*2-1
+        self.bias=np.random.randn(self.shape[1])
 
+    def Export(self):
+        ret = {}
+        i=0
+        ret['shape'] = self.shape
+        # print(ret['shape']);i+=1
+        ret['activationFunction'] = ActivationFunctions.Export(self.function)
+       
+        ret['output'] = self.output.tolist() if self.output is not None else None
+        # print(ret['output'] );i+=1
+        ret['input'] = np.array(self.input).tolist() if self.input is not None else None
+        # print(ret['input']);i+=1
+        ret['matrix'] = self.matrix.tolist() if self.matrix is not None else None
+        # print(ret['matrix']);i+=1
+        ret['bias'] = self.bias.tolist() if self.bias is not None else None
+        # print(ret['bias'] );i+=1
 
+        return ret
+
+    def Import(self,imp):
+        assert isinstance(imp,dict)
+        self.shape = imp['shape']
+        self.function = ActivationFunctions.Import( imp['activationFunction'] )
+        self.output = np.array(imp['output']) if imp['output'] != None else None 
+        self.input = np.array(imp['input'])if imp['input'] != None else None 
+        self.matrix = np.array(imp['matrix'])if imp['matrix'] != None else None 
+        self.bias = np.array(imp['bias'])if imp['bias'] != None else None 
+        return self
+            
     def forward(self,data,function=None,biasState = True):
         
         if function in [None]:
@@ -113,6 +135,35 @@ class Model:
         self.iterations = 100
         self.biasState = True
         self.externalMonitor = None
+
+    def Export(self):
+        ret = {}
+
+        ret['learningFactor']=self.learningFactor
+        ret['layers']=[[x[0],ActivationFunctions.Export(x[1])] for x in self.layers]
+        ret['structure'] = [i.Export() for i in self.structure] if self.structure != None else None
+        ret['dataset'] = dict(self.dataset)
+
+        ret['biasState'] = self.biasState
+        ret['iterations'] = self.iterations
+        print(ret)
+        
+        return ret
+
+
+
+    def Import(self,imp):
+        assert isinstance(imp,dict)
+
+        self.learningFactor = imp['learningFactor']
+        self.layers=[(i[0],ActivationFunctions.Import(i[1])) for i in imp['layers']] 
+        self.structure = [Layer(1000,1000).Import(i) for i in imp['structure']] if imp['structure'] != None else None
+        print(self.structure)
+        self.dataset = imp['dataset']
+        # self.loss_v = imp['loss_v']
+        self.biasState = imp['biasState']
+        self.iterations = self.iterations
+ 
     def addLayer(self,numberOfNeurons:int,function=ActivationFunctions.Default):
         assert numberOfNeurons>0
         # TODO to validate function
@@ -159,7 +210,7 @@ class Model:
         
     def SGD(self,x,y):
         self.forward(x)
-        self.loss_v=self.loss(y,LossFunctions.AE)
+        #self.loss_v=self.loss(y,LossFunctions.AE)
 
         nabla_w = [0]*len(self.structure)
         nabla_b = [0]*len(self.structure)
@@ -203,7 +254,8 @@ class Model:
                 for i  in range(len(self.structure)):
 
                     self.structure[i].matrix = self.structure[i].matrix - np.multiply(self.learningFactor,nabla_w[i])
-                    if self.biasState: self.structure[i].bias = self.structure[i].bias + np.multiply(self.learningFactor,nabla_b[i])
+                    if self.biasState: 
+                        self.structure[i].bias = self.structure[i].bias + self.learningFactor*nabla_b[i]
             perform_train = self.evaluate()
             perform_test = self.evaluate_test()
             

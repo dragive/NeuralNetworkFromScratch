@@ -14,8 +14,8 @@ model.addLayer(1,ActivationFunctions.unipolar)
 def monitor(iteration:int = None,wholeError:float=0.0,correction = None):
     global performance
     performance.append(wholeError)
-model.iterations = 200
-model.learningFactor=0.5
+model.iterations = 1000
+model.learningFactor=0.35
 model.biasState= True
     
 model.compileModel()
@@ -48,4 +48,5 @@ print("evaluate: ",model.evaluate())
 import matplotlib.pyplot as plt
 plt.plot(performance)
 plt.show()
-np.min(performance)
+print(np.min(performance))
+
