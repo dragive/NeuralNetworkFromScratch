@@ -5,9 +5,9 @@ import numpy as np
 class ActivationFunctions:
         
     def Export(func):
-        return "uni" if func == ActivationFunctions.unipolar or func == ActivationFunctions.Default else 'bi'
+        return "unipolar" if func == ActivationFunctions.unipolar or func == ActivationFunctions.Default else 'bipolar'
     def Import(name):
-        return ActivationFunctions.bipolar if name == 'bi' else ActivationFunctions.unipolar
+        return ActivationFunctions.bipolar if name == 'bipolar' else ActivationFunctions.unipolar
 
     def unipolar(data,derivative = False):
         if derivative:

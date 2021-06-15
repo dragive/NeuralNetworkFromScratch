@@ -1,4 +1,6 @@
+from os import name
 from tkinter.constants import BOTTOM, W
+from typing import AsyncContextManager
 import numpy as np
 import numpy
 from json import JSONEncoder
@@ -35,11 +37,11 @@ class GUI:
 
             self.topFrame = tk.Frame(self.main)
             self.topFrame.pack()
-
+            self.LabelFrameStructure = []
             self.bottomFrame = tk.Frame(self.main)
             self.bottomFrame.pack(side=BOTTOM)
-            print(self.AskForFilePath())
-            print(self.AskSaveAsFileName())
+            # print(self.AskForFilePath())
+            # print(self.AskSaveAsFileName())
             ###
             self.model.addLayer(4)
             self.model.addLayer(3)
@@ -48,37 +50,75 @@ class GUI:
             self.model.compileModel()
 
             ###
+            self.GenerateCompiledStructureWidget()
+            self.GenerateNotCompiledStructureWidget()
             
-
-            self.TopLabelFrame = tk.LabelFrame(self.topFrame,text="Compiled Structure of the network",padx=30,pady=12)
-            self.TopLabelFrame.grid(column=0,columnspan=300,row=3,rowspan=256,sticky='nswe')
-            if len(self.model.structure)==0:
-                self.temp = tk.Label(self.TopLabelFrame,text="Compiled Structure is empty")
-                self.temp.grid(row=1,column=1)
-
-            self.LabelFrameStructure = []
-            xx=0
-            row = 2;col=1
-            for x,i in enumerate(self.model.structure):
-                self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrame,text = "Input Layer" if x==0 else str(x)+". Hidden Layer"))
-                tk.Label(self.LabelFrameStructure[-1],text=str(x)).pack()
-                tk.Label(self.LabelFrameStructure[-1],text = str(i.matrix.shape[0])).pack()
-                self.LabelFrameStructure[-1].grid(row=row,column=col)
-                row+=1
-                xx=x
-
-            self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrame,text = "Output layer"))
-            tk.Label(self.LabelFrameStructure[-1],text=xx+1).pack()
-            tk.Label(self.LabelFrameStructure[-1],text=str(self.model.structure[xx].matrix.shape[1])).pack()
-            self.LabelFrameStructure[-1].grid(row=row,column=col)
-         
+            self.Update()
+            ##
 
             self.main.geometry("1000x800")
             self.create_widgets()
             
             self.main.mainloop()
 
+        def GenerateNotCompiledStructureWidget(self):
+            self.TopLabelFrameNotCompiled = tk.LabelFrame(self.topFrame,text="Not-Compiled Structure of the Network")
+            self.TopLabelFrameNotCompiled.grid(column=0,columnspan=300,row=3,rowspan=1,sticky='nswe')
+            
+            self.TopLabelFrameNotCompiledLabelStructure = tk.Label(self.TopLabelFrameNotCompiled,text = "(Input Layer) (Output Layer)")
+            self.TopLabelFrameNotCompiledLabelStructure.grid(row=10,column=10,columnspan=200)
 
+
+            self.TopLabelFrameNotCompiledButtonClear = tk.Button(self.TopLabelFrameNotCompiled,text = "Clear Structure", command=self.ModelClearLayers)
+            self.TopLabelFrameNotCompiledButtonClear.grid(row=5,column=10,sticky='nsw')
+
+            self.UpdateNotCompiledStructureWidget()
+        def Update(self):
+            self.UpdateNotCompiledStructureWidget()
+            self.UpdateCompiledStructureWidget()
+        def ModelClearLayers(self):
+            self.model.layers = []
+            self.Update()
+        def UpdateNotCompiledStructureWidget(self):
+            ls = self.model.layers
+            ret = "(Input Layer) "
+            
+            ret += ' -> '.join(['('+str(y[0])+', '+ActivationFunctions.Export(y[1])+')' for y in ls])
+                
+            ret += " (Output Layer)"
+            self.TopLabelFrameNotCompiledLabelStructure['text'] = ret
+
+        def GenerateCompiledStructureWidget(self):
+            
+            self.TopLabelFrameCompiled = tk.LabelFrame(self.topFrame,text="Compiled Structure of the Network",padx=30,pady=12)
+            self.TopLabelFrameCompiled.grid(column=0,columnspan=300,row=4,rowspan=256,sticky='nswe')
+            if len(self.model.structure)==0 or len(self.LabelFrameStructure)==0:
+                self.temp = tk.Label(self.TopLabelFrameCompiled,text="Compiled Structure is empty")
+                self.temp.grid(row=1,column=1)
+            
+            self.TopLabelFramePlaceholder = tk.Label()
+            self.UpdateCompiledStructureWidget()
+        def UpdateCompiledStructureWidget(self):
+            self.ClearCompiledStructureWigdet()
+            xx=0
+            row = 2;col=1
+            for x,i in enumerate(self.model.structure):
+                self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Input Layer" if x==0 else str(x)+". Hidden Layer"))
+                tk.Label(self.LabelFrameStructure[-1],text=str(x)).pack()
+                tk.Label(self.LabelFrameStructure[-1],text = str(i.matrix.shape[0])).pack()
+                self.LabelFrameStructure[-1].grid(row=row,column=col)
+                row+=1
+                xx=x
+
+            self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Output layer"))
+            tk.Label(self.LabelFrameStructure[-1],text=xx+1).pack()
+            tk.Label(self.LabelFrameStructure[-1],text=str(self.model.structure[xx].matrix.shape[1])).pack()
+            self.LabelFrameStructure[-1].grid(row=row,column=col)
+            
+        def ClearCompiledStructureWigdet(self):
+            for i in self.LabelFrameStructure:
+                i.destroy()
+            self.LabelFrameStructure=[]
         def create_widgets(self):
             
             self.labelTitle = tk.Label(self.topFrame,text="NNFS")
@@ -135,21 +175,48 @@ class GUI:
 
 
         def ImportNetworkFromFile(self):
-            data=json.loads(self.ExportNetworkToFile())
-            self.model.Import(data['model'])
-            self.modelEvaluationTest = data['evaluate_test']
-            self.modelEvaluationTrain = data['evaluate_train']
+            nameoffile = self.AskForFilePath()
+            if nameoffile == () or nameoffile == '':
+                return
+            # data=json.loads(self.ExportNetworkToFile())
+            # self.model.Import(data['model'])
+            # self.modelEvaluationTest = data['evaluate_test']
+            # self.modelEvaluationTrain = data['evaluate_train']
+
+            with open(nameoffile,'r') as file:
+                data = json.load(file)
+
+            try:
+                self.model.Import(data['model'])
+                self.modelEvaluationTest = data['evaluate_test']
+                self.modelEvaluationTrain = data['evaluate_train']
+            except Exception as ex:
+                tkmsg.showwarning("File Import Failed", "File import failed!")
+                print(ex)
+                return
+            tkmsg.showinfo("Import", "Import done!")
+            self.Update()
+            return
 
         def ExportNetworkToFile(self):
+            nameeoffile=self.AskSaveAsFileName()
+            if nameeoffile == "" or nameeoffile == ():
+                return
             temp = {
                 'model': self.model.Export(),
                 'evaluate_train' : self.modelEvaluationTrain,
                 'evaluate_test' : self.modelEvaluationTest
             }
-            print('####\n'+str(temp))
-            return json.dumps(temp, cls=NumpyArrayEncoder)
-             
-
+            # print('####\n'+str(temp))
+            try:
+                with open(nameeoffile,'w+') as file:
+                    json.dump(temp,file, cls=NumpyArrayEncoder)
+            except Exception as ex:
+                print(ex)
+                tkmsg.showwarning("File Export Failed", "File export failed!")
+                return
+            tkmsg.showinfo("Export Done", "Correct Export Data From Network")
+            return
         def Evaluate(self):
             if not len(self.model.structure)>0:
                 tkmsg.showwarning("Network not compiled","Please compile network to be able to test it on a data!")
@@ -349,6 +416,7 @@ class GUI:
                     temp_AF = ActivationFunctions.bipolar
                 self.model.addLayer(self.CreateNewLayerNumberOfNeurons,temp_AF)
                 del(temp_AF)
+                self.UpdateNotCompiledStructureWidget()
                 self.CreateNewLayerTopLevel.destroy()
             except Exception :
                 tkmsg.showerror("Invalid Input!",'Please make sure, number of neurons in this layer is correct!')
