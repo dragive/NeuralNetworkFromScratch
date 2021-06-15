@@ -13,7 +13,7 @@ import tkinter.messagebox as tkmsg
 import matplotlib.pyplot as plt
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 
-
+import re
 
 
 
@@ -43,11 +43,11 @@ class GUI:
             # print(self.AskForFilePath())
             # print(self.AskSaveAsFileName())
             ###
-            self.model.addLayer(4)
-            self.model.addLayer(3)
-            self.model.addLayer(2)
-            self.model.addLayer(1)
-            self.model.compileModel()
+            # self.model.addLayer(4)
+            # self.model.addLayer(3)
+            # self.model.addLayer(2)
+            # self.model.addLayer(1)
+            # self.model.compileModel()
 
             ###
             self.GenerateCompiledStructureWidget()
@@ -65,7 +65,7 @@ class GUI:
             self.TopLabelFrameNotCompiled = tk.LabelFrame(self.topFrame,text="Not-Compiled Structure of the Network")
             self.TopLabelFrameNotCompiled.grid(column=0,columnspan=300,row=3,rowspan=1,sticky='nswe')
             
-            self.TopLabelFrameNotCompiledLabelStructure = tk.Label(self.TopLabelFrameNotCompiled,text = "(Input Layer) (Output Layer)")
+            self.TopLabelFrameNotCompiledLabelStructure = tk.Label(self.TopLabelFrameNotCompiled,text = "[Input Layer] [Output Layer]")
             self.TopLabelFrameNotCompiledLabelStructure.grid(row=10,column=10,columnspan=200)
 
 
@@ -81,39 +81,71 @@ class GUI:
             self.Update()
         def UpdateNotCompiledStructureWidget(self):
             ls = self.model.layers
-            ret = "(Input Layer) "
+            ret = "[Input Layer]  "
             
             ret += ' -> '.join(['('+str(y[0])+', '+ActivationFunctions.Export(y[1])+')' for y in ls])
                 
-            ret += " (Output Layer)"
+            ret += "  [Output Layer]"
             self.TopLabelFrameNotCompiledLabelStructure['text'] = ret
 
         def GenerateCompiledStructureWidget(self):
             
             self.TopLabelFrameCompiled = tk.LabelFrame(self.topFrame,text="Compiled Structure of the Network",padx=30,pady=12)
             self.TopLabelFrameCompiled.grid(column=0,columnspan=300,row=4,rowspan=256,sticky='nswe')
-            if len(self.model.structure)==0 or len(self.LabelFrameStructure)==0:
-                self.temp = tk.Label(self.TopLabelFrameCompiled,text="Compiled Structure is empty")
-                self.temp.grid(row=1,column=1)
+            self.UpdateCompiledStructureWidgetEmpty()
+
             
-            self.TopLabelFramePlaceholder = tk.Label()
+            
             self.UpdateCompiledStructureWidget()
+
+
+        def UpdateCompiledStructureWidgetEmpty(self):
+            if len(self.model.structure)==0 :#or len(self.LabelFrameStructure)==0:
+                print('EMPTY?????')
+                self.templabel1 = tk.Label(self.TopLabelFrameCompiled,text="Compiled Structure is empty")
+                self.templabel1.grid(row=1,column=1)
+            else:
+                print('NOOOOOOOT EMPTY?????')
+                self.templabel1.destroy()
         def UpdateCompiledStructureWidget(self):
+            
             self.ClearCompiledStructureWigdet()
+            # self.UpdateCompiledStructureWidgetEmpty()
+            if len(self.model.structure)==0:
+                return
             xx=0
             row = 2;col=1
+
+            self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Input layer"))
+            tk.Label(self.LabelFrameStructure[-1],text=f"Number of neurons: {self.model.structure[xx].matrix.shape[0]}").grid(row=1,column=1,sticky = "wn")
+            
+            self.LabelFrameStructure[-1].grid(row=row,column=col,sticky= 'new')
+            row+=1
+            
+
+
             for x,i in enumerate(self.model.structure):
-                self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Input Layer" if x==0 else str(x)+". Hidden Layer"))
-                tk.Label(self.LabelFrameStructure[-1],text=str(x)).pack()
-                tk.Label(self.LabelFrameStructure[-1],text = str(i.matrix.shape[0])).pack()
+                xx=x
+                self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Output Layer" if x==len(self.model.structure)-1 else str(xx+1)+". Hidden Layer"))
+                tk.Label(self.LabelFrameStructure[-1],text=f"Number of neurons: {self.model.structure[xx].matrix.shape[1]}").grid(row=1,column=1,sticky = "wn")
+                tk.Label(self.LabelFrameStructure[-1],text=f"Activation Funciton: {ActivationFunctions.Export( self.model.structure[xx].function)}").grid(row=2,column=1,sticky = "wn")
+
                 self.LabelFrameStructure[-1].grid(row=row,column=col)
                 row+=1
-                xx=x
+            self.UpdateCompiledStructureWidgetEmpty()
+            ##
+            # for x,i in enumerate(self.model.structure):
+            #     self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Input Layer" if x==0 else str(x)+". Hidden Layer"))
+            #     tk.Label(self.LabelFrameStructure[-1],text=str(x)).pack()
+            #     tk.Label(self.LabelFrameStructure[-1],text = str(i.matrix.shape[0])).pack()
+            #     self.LabelFrameStructure[-1].grid(row=row,column=col)
+            #     row+=1
+            #     xx=x
 
-            self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Output layer"))
-            tk.Label(self.LabelFrameStructure[-1],text=xx+1).pack()
-            tk.Label(self.LabelFrameStructure[-1],text=str(self.model.structure[xx].matrix.shape[1])).pack()
-            self.LabelFrameStructure[-1].grid(row=row,column=col)
+            # self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Output layer"))
+            # tk.Label(self.LabelFrameStructure[-1],text=xx+1).pack()
+            # tk.Label(self.LabelFrameStructure[-1],text=str(self.model.structure[xx].matrix.shape[1])).pack()
+            # self.LabelFrameStructure[-1].grid(row=row,column=col)
             
         def ClearCompiledStructureWigdet(self):
             for i in self.LabelFrameStructure:
@@ -319,7 +351,56 @@ class GUI:
             plt.plot(self.modelEvaluationTest)
             plt.show()
 
+        def ArffDataFormatInport(self,filename,Nendo:int=1):
+            dataset={
+                'train':{
+                    'egzo':[],
+                    'endo':[]
+                },
+                'test':{
+                    'egzo':[],
+                    'endo':[]
+                }
+            }
 
+            content = ''
+            with open(filename, 'r') as file:
+                content = file.read()
+
+            content = content.split('\n')
+            toggle = None
+            egzo = Nendo
+            preprocedDataset = []
+            for i in content:
+                if re.match('^%.*',i):
+                    # print('comment\\\\     '+i)
+                    pass
+                elif re.match('^((\d*(\.\d*)?),)*\d+(\.\d*)?$',i):
+                    preprocedDataset.append(i)
+                elif re.match('^@egzogenic *\d+ *$',i):
+                    try:
+                        egzo=int(re.findall('\d+',i)[0])
+                    except Exception as ex:
+                        print(ex)
+                        pass
+                elif re.match('^(@trainData *|@testData *)$',i):
+                    preprocedDataset.append(i)
+            # print(preprocedDataset,egzo)
+            for i in preprocedDataset:
+                sp = i.split(' ')[0]
+                if sp == '@trainData':
+                    toggle="train"
+                elif sp == "@testData":
+                    toggle='test'
+                else:
+                    if toggle is None:
+                        continue
+                    l=i.split(',')
+                    l = [float(y) for y in l]
+                    dataset[toggle]['egzo'].append(l[:-egzo])
+                    dataset[toggle]['endo'].append(l[-egzo:])
+
+            return dataset
 
         def ImportDataFromFile(self):
             self.DataFormatOk= False
@@ -336,6 +417,8 @@ class GUI:
                     print(ex)
                     tkmsg.showerror("Wrong file format", "File format corrupteed! Cannot parse data!")
                     return
+            elif nameoffile.split('.')[-1] == 'arff':
+                self.DataJsonRaw=self.ArffDataFormatInport(nameoffile)
             else:
                 tkmsg.showerror("Wrong file extention", "Unrecognized file extention!")
                 return
@@ -432,6 +515,8 @@ class GUI:
 
 
             if not self.DataFormatOk:
+                if len(self.model.structure) == 0:
+                    return
                 for y in ['train','test']:
                     shape =  self.model.structure[0].matrix.shape[0]
                     for i in self.model.dataset[y]['egzo']:
@@ -475,8 +560,9 @@ class GUI:
                 tkmsg.showerror("Too few layers!", "Network requiers at least 2 layers, input and output. Please add them!")
                 return
             self.model.compileModel()
-            if DEBUG:
-                tkmsg.showinfo("compiled!","Model was compiled!")
+            self.Update()
+            # if DEBUG:
+            tkmsg.showinfo("compiled!","Model was compiled!")
         def Settings(self):
             self.SettingsTopLevel = tk.Toplevel()
             

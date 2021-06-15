@@ -1,0 +1,12 @@
+%comment
+
+%comment 2
+@egzogenic 1
+@trainData
+
+1,1,1,1,0.5
+1,1,0,0,1
+1,1,1,0,0
+
+@testData
+2,3,4,5,6
