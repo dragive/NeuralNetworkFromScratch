@@ -55,22 +55,22 @@ class Layer:
         self.shape = shape
 
         self._init_matrix()
-        self.output=None
-        self.input=None
 
-   
     def __init__(self,shape_x:int,shape_y:int,function=ActivationFunctions.Default) -> None:
         assert shape_y>0 and shape_x>0
 
         self.shape = (shape_x,shape_y)
         self.function=function
         self._init_matrix()
-        self.output=None
-        self.input=None
+
 
     def _init_matrix(self):
         self.matrix = (np.random.randn(self.shape[0],self.shape[1]))*2-1
         self.bias=np.random.randn(self.shape[1])
+        self.dot = np.zeros(self.shape[1])
+        # print(self.shape[1])
+        self.output = None
+        self.input=None
 
     def Export(self):
         ret = {}
@@ -117,13 +117,7 @@ class Layer:
 #             print(self.dot,"####",)
         self.output = function(self.dot)
         return self.output.copy()
-    
-    
-    
-    
-    
-    
-
+   
 class Model:
 
     def __init__(self):
@@ -135,6 +129,9 @@ class Model:
         self.iterations = 100
         self.biasState = True
         self.externalMonitor = None
+        self.errorValue = 0.05
+        self.OneStepStorage = 0
+
 
     def Export(self):
         ret = {}
@@ -260,6 +257,38 @@ class Model:
             perform_test = self.evaluate_test()
             
             self.internalMonitor(counter,perform_train,perform_test,(nabla_w.copy(),nabla_b.copy()))
+            if perform_train <=self.errorValue:
+                return
+    def Step(self):
+        for x,y in zip(self.dataset['train']['egzo'],self.dataset['train']['endo']):
+
+            nabla_w, nabla_b = self.SGD(x,y)
+
+            for i  in range(len(self.structure)):
+
+                self.structure[i].matrix = self.structure[i].matrix - np.multiply(self.learningFactor,nabla_w[i])
+                if self.biasState: 
+                    self.structure[i].bias = self.structure[i].bias + self.learningFactor*nabla_b[i]
+        perform_train = self.evaluate()
+        perform_test = self.evaluate_test()
+        
+        self.internalMonitor(1,perform_train,perform_test,(nabla_w.copy(),nabla_b.copy()))
+    def OneStep(self):
+        
+        x,y=zip(self.dataset['train']['egzo'],self.dataset['train']['endo'][self.OneStepStorage])
+
+        nabla_w, nabla_b = self.SGD(x,y)
+
+        for i  in range(len(self.structure)):
+
+            self.structure[i].matrix = self.structure[i].matrix - np.multiply(self.learningFactor,nabla_w[i])
+            if self.biasState: 
+                self.structure[i].bias = self.structure[i].bias + self.learningFactor*nabla_b[i]
+        perform_train = self.evaluate()
+        perform_test = self.evaluate_test()
+        
+        self.internalMonitor(1,perform_train,perform_test,(nabla_w.copy(),nabla_b.copy()))
+        self.OneStepStorage+=1
     
     def setExternalMonitor(self, monitor=None):
         if not monitor == None:

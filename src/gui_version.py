@@ -1,10 +1,13 @@
 from os import name
-from tkinter.constants import BOTTOM, W
+from tkinter.constants import BOTTOM, W, X
 from typing import AsyncContextManager
 import numpy as np
 import numpy
 from json import JSONEncoder
+import copy
+from numpy.lib.shape_base import column_stack
 
+from numpy.random import default_rng
 from NN import *
 import json
 import tkinter as tk
@@ -17,13 +20,14 @@ import re
 
 
 
-DEBUG = True
+DEBUG = False
 
 class GUI:
     
     class MainWindowC:
         def __init__(self):
             self.main = tk.Tk()
+            self.main.title("Neural Networks From Scratch")
             self.model = Model()
             self.ModelBiasState = True
             self.NameOfFile = None
@@ -34,21 +38,15 @@ class GUI:
             self.model.iterations= 250
             self.DataFormatOk= False
             self.showFrame = None
-
+            self.LayerMonitorWidgetStorage={}
             self.topFrame = tk.Frame(self.main)
             self.topFrame.pack()
             self.LabelFrameStructure = []
             self.bottomFrame = tk.Frame(self.main)
             self.bottomFrame.pack(side=BOTTOM)
-            # print(self.AskForFilePath())
-            # print(self.AskSaveAsFileName())
-            ###
-            # self.model.addLayer(4)
-            # self.model.addLayer(3)
-            # self.model.addLayer(2)
-            # self.model.addLayer(1)
-            # self.model.compileModel()
+            self.DataManagerStorage = {}
 
+            self.main.protocol("WM_DELETE_WINDOW", self.on_closing)
             ###
             self.GenerateCompiledStructureWidget()
             self.GenerateNotCompiledStructureWidget()
@@ -61,6 +59,11 @@ class GUI:
             
             self.main.mainloop()
 
+        def on_closing(self):
+            if tkmsg.askokcancel("Quit", "Do you want to quit?"):
+                self.main.destroy()
+
+            
         def GenerateNotCompiledStructureWidget(self):
             self.TopLabelFrameNotCompiled = tk.LabelFrame(self.topFrame,text="Not-Compiled Structure of the Network")
             self.TopLabelFrameNotCompiled.grid(column=0,columnspan=300,row=3,rowspan=1,sticky='nswe')
@@ -101,12 +104,81 @@ class GUI:
 
         def UpdateCompiledStructureWidgetEmpty(self):
             if len(self.model.structure)==0 :#or len(self.LabelFrameStructure)==0:
-                print('EMPTY?????')
+                # print('EMPTY?????')
                 self.templabel1 = tk.Label(self.TopLabelFrameCompiled,text="Compiled Structure is empty")
                 self.templabel1.grid(row=1,column=1)
             else:
-                print('NOOOOOOOT EMPTY?????')
+                # print('NOOOOOOOT EMPTY?????')
                 self.templabel1.destroy()
+
+        def LayerMonitorWidgetSetupOnClose(self,number):
+            self.LayerMonitorWidgetStorage[number]['toplevel'].destroy()
+            del(self.LayerMonitorWidgetStorage[number])
+            
+        def LayerMonitorWidgetSetup(self,number):
+            storage = self.LayerMonitorWidgetStorage
+            if not number in storage.keys():
+                storage [number] = {}
+            else:
+                storage[number]['toplevel'].lift()
+                return
+            st =storage[number]
+            st['toplevel'] = tk.Toplevel()
+            st['toplevel'].title('Layer Monitor')
+            st['toplevel'].protocol("WM_DELETE_WINDOW", lambda number=number:self.LayerMonitorWidgetSetupOnClose(number))
+        
+            st['labeltitle'] = tk.Label(st['toplevel'],text="Hidden layer "+str(number+1)+'\n' if number +1 !=len( self.model.structure) else 'Output Layer')
+            st['labeltitle'].config(font=("FreeSans",15))
+            st['labeltitle'].grid(row=1,column = 1)
+
+            st['structure'] = tk.Label(st['toplevel'],text = '\n')
+            st['structure'].grid(row=2,column = 1)
+            self.LayerMonitorWidgetSetupUpdate()
+            st['toplevel'].lift()
+        
+        def LayerMonitorWidgetSetupUpdate(self):
+            storage = self.LayerMonitorWidgetStorage
+            for k in storage.keys():
+                number = k
+                if self.model.structure[number].bias.ndim >1:
+                    self.model.structure[number].bias = self.model.structure[number].bias[0]
+                if len( self.model.structure[number].dot) == 1000:
+                    self.model.structure[number].dot = np.zeros(self.model.structure[number].shape[1])
+                if  self.model.structure[number].output is None:
+                    self.model.structure[number].output = np.zeros(self.model.structure[number].shape[1])
+                text = ''
+                if self.model.biasState:
+                    text=  '\n '.join(
+                    [' a = '+' + '.join(
+                                [f'({y:7.4}*x{z+1})' for z,y in enumerate(i)]
+                                )
+                                    + f' + ( {b :7.4} ) '# = {d :7.4} -> f(a) =  {z :7.4}' 
+                                        for i,b,d,z in zip(self.model.structure[number].matrix.tolist(),self.model.structure[number].bias.tolist(),\
+                                            self.model.structure[number].dot.tolist(),self.model.structure[number].output.tolist())]
+                    )
+                else:
+                    text =  '\n '.join(
+                    [''+' + '.join(
+                                [f'({y:7.4}*x{z+1})' for z,y in enumerate(i)]
+                                )
+                                    + f''# = {d :7.4} -> f(a) =  {z :7.4}' 
+                                        for i,b,d,z in zip(self.model.structure[number].matrix.tolist(),self.model.structure[number].bias.tolist(),\
+                                            self.model.structure[number].dot.tolist(),self.model.structure[number].output.tolist())]
+                    )
+                text +='\n'
+                if not (self.model.structure[number].input is None or len(self.model.structure[number].input)==1000):
+                    text+='Input: '+', '.join([f'{foo :7.4}' for foo in self.model.structure[number].input])+'\n'
+                
+                if not (self.model.structure[number].dot is None or len(self.model.structure[number].dot)==1000):
+                    text+='Linear combination: '+', '.join([f'{foo :7.4}' for foo in self.model.structure[number].dot])+'\n'
+                
+                if not (self.model.structure[number].output is None or len(self.model.structure[number].output)==1000):
+                    text+='Output: '+', '.join([f'{foo :7.4}' for foo in self.model.structure[number].output])+'\n'
+                storage[k]['structure']['text']=text
+                
+            
+            
+
         def UpdateCompiledStructureWidget(self):
             
             self.ClearCompiledStructureWigdet()
@@ -119,19 +191,23 @@ class GUI:
             self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Input layer"))
             tk.Label(self.LabelFrameStructure[-1],text=f"Number of neurons: {self.model.structure[xx].matrix.shape[0]}").grid(row=1,column=1,sticky = "wn")
             
+            
             self.LabelFrameStructure[-1].grid(row=row,column=col,sticky= 'new')
             row+=1
             
 
+            xx=0
 
-            for x,i in enumerate(self.model.structure):
-                xx=x
-                self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Output Layer" if x==len(self.model.structure)-1 else str(xx+1)+". Hidden Layer"))
+            for i in self.model.structure:
+                
+                lamb = lambda xx=xx:self.LayerMonitorWidgetSetup(xx)
+                self.LabelFrameStructure.append(tk.LabelFrame(self.TopLabelFrameCompiled,text = "Output Layer" if xx==len(self.model.structure)-1 else str(xx+1)+". Hidden Layer"))
                 tk.Label(self.LabelFrameStructure[-1],text=f"Number of neurons: {self.model.structure[xx].matrix.shape[1]}").grid(row=1,column=1,sticky = "wn")
                 tk.Label(self.LabelFrameStructure[-1],text=f"Activation Funciton: {ActivationFunctions.Export( self.model.structure[xx].function)}").grid(row=2,column=1,sticky = "wn")
-
+                tk.Button(self.LabelFrameStructure[-1],text="See details",command = lamb).grid(row=3,column=1,sticky='news')
                 self.LabelFrameStructure[-1].grid(row=row,column=col)
                 row+=1
+                xx=xx+1
             self.UpdateCompiledStructureWidgetEmpty()
             ##
             # for x,i in enumerate(self.model.structure):
@@ -154,14 +230,19 @@ class GUI:
         def create_widgets(self):
             
             self.labelTitle = tk.Label(self.topFrame,text="NNFS")
-            self.labelTitle.config(font=("FreeSans",30))
-            self.labelTitle.grid(row=1,column=0,columnspan=1,rowspan=2)
+            # self.labelTitle.config(font=("FreeSans",30))
+            # self.labelTitle.grid(row=1,column=0,columnspan=1,rowspan=2)
             padx = 3
             temp_col = 1
             row = 1
-            self.buttonImportDataFromFile = tk.Button(self.topFrame, text="Import Data From File", command=self.ImportDataFromFile)
-            self.buttonImportDataFromFile.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
+
+            self.buttonManageDataFile = tk.Button(self.topFrame, text="Manage Data",command=self.DataManager)
+            self.buttonManageDataFile.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
             temp_col+=1
+
+            # self.buttonImportDataFromFile = tk.Button(self.topFrame, text="Import Data From File", command=self.ImportDataFromFile)
+            # self.buttonImportDataFromFile.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
+            # temp_col+=1
 
             self.buttonCreateLayer = tk.Button(self.topFrame, text="Create layer", command=self.CreateNewLayer)
             self.buttonCreateLayer.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
@@ -172,10 +253,10 @@ class GUI:
             temp_col+=1
 
             self.buttonTrainNetwork = tk.Button(self.topFrame, text="Train Network", command= self.TrainNetwork)
-            self.buttonTrainNetwork.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
-            temp_col+=1
+            self.buttonTrainNetwork.grid(row=row,column=temp_col,padx=padx,sticky='nswe',columnspan=2)
+            temp_col+=2
 
-            self.buttonExportNetworkFromFile = tk.Button(self.topFrame, text="Export Network From File",command=self.ExportNetworkToFile)
+            self.buttonExportNetworkFromFile = tk.Button(self.topFrame, text="Export Network To File",command=self.ExportNetworkToFile)
             self.buttonExportNetworkFromFile.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
             temp_col=1
             row = 2
@@ -192,28 +273,246 @@ class GUI:
             self.buttonTrainStatistics.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
             temp_col+=1
 
+
+            self.buttonStep = tk.Button(self.topFrame, text="One Epoch",command=self.Step)
+            self.buttonStep.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
+            temp_col+=1
+
+            self.buttonOneStep = tk.Button(self.topFrame, text="One Iteration",command=self.OneStep)
+            self.buttonOneStep.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
+            temp_col+=1
+
+
+
             self.buttonImportNetworkFromFile = tk.Button(self.topFrame, text="Import Network From File",command=self.ImportNetworkFromFile)
-            self.buttonImportNetworkFromFile.grid(row=row,column=temp_col+1,padx=padx,sticky='nswe')
+            self.buttonImportNetworkFromFile.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
             temp_col+=1
             
             del(temp_col)
 
+            if DEBUG:
+                self.LabelDEBUG = tk.Label(self.bottomFrame, text="EMPTY")
+                self.LabelDEBUG.grid(row=0,column=0,padx=padx)
 
-            self.LabelDEBUG = tk.Label(self.bottomFrame, text="EMPTY")
-            self.LabelDEBUG.grid(row=0,column=0,padx=padx)
+                self.buttonImportFromFile = tk.Button(self.bottomFrame, text="TE                EST", command=self.DEBUG_helper)
+                self.buttonImportFromFile.grid(row=1,column=0,padx=padx)
+        def DataManagerImport(self):
+            self.ImportDataFromFile()
+            self.DataManagerTopLevel.destroy()
+            if self.model.dataset is None or self.model.dataset == {}:
+                pass
+            else:
+                tkmsg.showinfo('Data Imported','Data imported correctly')
+        def DataManager(self):
+            self.DataManagerTopLevel = tk.Toplevel()
+            self.DataManagerTopLevel.title('Data Manager')
+            self.DataManagerImportData = tk.Button(self.DataManagerTopLevel, text="Import From File",command = self.DataManagerImport)
+            self.DataManagerImportData.grid(row=1,column=1,columnspan=3)
+            
 
-            self.buttonImportFromFile = tk.Button(self.bottomFrame, text="TE                EST", command=self.DEBUG_helper)
-            self.buttonImportFromFile.grid(row=1,column=0,padx=padx)
+            index = 0
+            self.DataManagerStorage = {}
+            if self.model.dataset is None or self.model.dataset == {}:
+                tk.Label(self.DataManagerTopLevel, text="There's no data").grid(row=2,column=1,columnspan=2,pady=30,padx=30)
+                return
+            tk.Label(self.DataManagerTopLevel, text="Check \"Train\" to include data to train datast").grid(row=2,column=1,columnspan=2,pady=20)
+            tk.Button(self.DataManagerTopLevel,text="Submit",command=self.DataManagerReadAndExit).grid(row=1000,column=1,columnspan=2)
+            # print(self.model.dataset)
+            for part in ('train','test'):
+                for i in range(len(self.model.dataset[part]['egzo'])):
+                    self.DataManagerStorage[index]={}
+
+                    self.DataManagerStorage[index]['var'] = tk.StringVar()
+                    self.DataManagerStorage[index]['var'].set(part)
+                    self.DataManagerStorage[index]['data']={}
+                    self.DataManagerStorage[index]['data']['egzo'] = self.model.dataset[part]['egzo'][i]
+                    self.DataManagerStorage[index]['data']['endo'] = self.model.dataset[part]['endo'][i]
+
+                    self.DataManagerStorage[index]['checkbox'] = tk.Checkbutton(self.DataManagerTopLevel ,text=' Train ',variable=self.DataManagerStorage[index]['var'], onvalue='train', offvalue='test')
+                    self.DataManagerStorage[index]['checkbox'].grid(row=index+3,column =1,pady=2)
+                    # print(self.model.dataset[part]['egzo'][i])
+                    text=', '.join([str(foo) for foo in self.model.dataset[part]['egzo'][i]])+' -> '+', '.join([str(foo) for foo in self.model.dataset[part]['endo'][i]])
+                    
+                    self.DataManagerStorage[index]['label'] = tk.Label(self.DataManagerTopLevel,text =text)
+                    self.DataManagerStorage[index]['label'].grid(row=index+3,column =2,pady=2)
+
+                    index +=1
+            self.DataManagerStorage['index']=index
+        def DataManagerReadAndExit(self):
+            self.model.dataset={
+                'train':{
+                    'egzo':[],
+                    'endo':[]
+                },
+                'test': {
+                    'egzo':[],
+                    'endo':[]
+                }
+            }
+            for index in range(self.DataManagerStorage['index']):
+                self.model.dataset[
+                    self.DataManagerStorage[index]['var'].get()
+                ]['egzo'].append(self.DataManagerStorage[index]['data']['egzo'])
+                self.model.dataset[
+                    self.DataManagerStorage[index]['var'].get()
+                ]['endo'].append(self.DataManagerStorage[index]['data']['endo'])
+            self.DataManagerTopLevel.destroy()
+        def TrainNetwork(self):
+            
+            ok=True
+
+
+            if not self.DataFormatOk:
+                if len(self.model.structure) == 0:
+                    return
+                for y in ['train','test']:
+                    shape =  self.model.structure[0].matrix.shape[0]
+                    for i in self.model.dataset[y]['egzo']:
+                        if len(i)!=shape:
+                            ok=False
+                            break
+                    if not ok:
+                        break
+
+
+            if not self.DataFormatOk and ok:
+                for y in ['train','test']:
+                    shape =  self.model.structure[-1].matrix.shape[-1]
+                    for i in self.model.dataset[y]['endo']:
+                        if len(i)!=shape:
+                            ok=False
+                            break
+                    if not ok:
+                        break
+
+
+            if not ok:
+                tkmsg.showerror("Data and structure", "Dimentions of data and network don't match!")
+                return
+            else:
+                self.DataFormatOk = True
+
+            if len(self.model.structure) == 0 or self.model.dataset ==None or self.model.dataset=={} or (not "train" in self.model.dataset.keys()) or (not "train" in self.model.dataset.keys()):
+                tkmsg.showerror("Uninitialized Network", "Please make sure the dataset is imported and network is compiled!")
+                return 
+            self.model.setExternalMonitor(self.TrainNetworkMonitor)
+            # TODO add including monitor
+            self.model.train()
+            try:
+                self.TrainStatisticsUpadte()
+            except Exception as ex:
+                if len(self.LayerMonitorWidgetStorage.keys()) ==0:
+                    pass
+            tkmsg.showinfo("Model Trained!","Model is trained!")
+            self.LayerMonitorWidgetSetupUpdate()
+                    
+                
+
+        def OneStep(self):
+            
+            ok=True
+
+
+            if not self.DataFormatOk:
+                if len(self.model.structure) == 0:
+                    return
+                for y in ['train','test']:
+                    shape =  self.model.structure[0].matrix.shape[0]
+                    for i in self.model.dataset[y]['egzo']:
+                        if len(i)!=shape:
+                            ok=False
+                            break
+                    if not ok:
+                        break
+
+
+            if not self.DataFormatOk and ok:
+                for y in ['train','test']:
+                    shape =  self.model.structure[-1].matrix.shape[-1]
+                    for i in self.model.dataset[y]['endo']:
+                        if len(i)!=shape:
+                            ok=False
+                            break
+                    if not ok:
+                        break
+
+
+            if not ok:
+                tkmsg.showerror("Data and structure", "Dimentions of data and network don't match!")
+                return
+            else:
+                self.DataFormatOk = True
+
+            if len(self.model.structure) == 0 or self.model.dataset ==None or self.model.dataset=={} or (not "train" in self.model.dataset.keys()) or (not "train" in self.model.dataset.keys()):
+                tkmsg.showerror("Uninitialized Network", "Please make sure the dataset is imported and network is compiled!")
+                return 
+            self.model.setExternalMonitor(self.TrainNetworkMonitor)
+            # TODO add including monitor
+            self.model.OneStep()
+            try:
+                self.TrainStatisticsUpadte()
+            except Exception as ex:
+                pass
+            
+            self.LayerMonitorWidgetSetupUpdate()
+    
+
+        def Step(self):
+            
+            ok=True
+
+
+            if not self.DataFormatOk:
+                if len(self.model.structure) == 0:
+                    return
+                for y in ['train','test']:
+                    shape =  self.model.structure[0].matrix.shape[0]
+                    for i in self.model.dataset[y]['egzo']:
+                        if len(i)!=shape:
+                            ok=False
+                            break
+                    if not ok:
+                        break
+
+
+            if not self.DataFormatOk and ok:
+                for y in ['train','test']:
+                    shape =  self.model.structure[-1].matrix.shape[-1]
+                    for i in self.model.dataset[y]['endo']:
+                        if len(i)!=shape:
+                            ok=False
+                            break
+                    if not ok:
+                        break
+
+
+            if not ok:
+                tkmsg.showerror("Data and structure", "Dimentions of data and network don't match!")
+                return
+            else:
+                self.DataFormatOk = True
+
+            if len(self.model.structure) == 0 or self.model.dataset ==None or self.model.dataset=={} or (not "train" in self.model.dataset.keys()) or (not "train" in self.model.dataset.keys()):
+                tkmsg.showerror("Uninitialized Network", "Please make sure the dataset is imported and network is compiled!")
+                return 
+            self.model.setExternalMonitor(self.TrainNetworkMonitor)
+            # TODO add including monitor
+            self.model.Step()
+            try:
+                self.TrainStatisticsUpadte()
+            except Exception as ex:
+                if len(self.LayerMonitorWidgetStorage.keys()) ==0:
+                    tkmsg.showinfo("Model Trained!","Model is trained!")
+            
+            self.LayerMonitorWidgetSetupUpdate()
+
+
 
 
         def ImportNetworkFromFile(self):
             nameoffile = self.AskForFilePath()
             if nameoffile == () or nameoffile == '':
                 return
-            # data=json.loads(self.ExportNetworkToFile())
-            # self.model.Import(data['model'])
-            # self.modelEvaluationTest = data['evaluate_test']
-            # self.modelEvaluationTrain = data['evaluate_train']
 
             with open(nameoffile,'r') as file:
                 data = json.load(file)
@@ -255,6 +554,7 @@ class GUI:
                 return
             
             self.EvaluateTopLevel = tk.Toplevel()
+            self.EvaluateTopLevel.title('Evaluate')
 
             self.EvaluateLabelMainLabel = tk.Label(self.EvaluateTopLevel,text="Input data to the network.\n\tWrite Input data separetet by comma.\n")
             self.EvaluateLabelMainLabel.grid(row=1,column=0,columnspan=2)
@@ -289,12 +589,11 @@ class GUI:
                 tkmsg.showwarning("Input data wrong format","Please correct input data to match dims of network!")
                 return
 
-        def ShowNetworkStructure(self ):
-            if self.showFrame == None:
-                self.showFrame = tk.Frame(self.topFrame)
+
         def DEBUG_helper(self):
-            #self.ShowNetworkStructure()
-            value = "self.model.layers"+ str(self.model.layers)+"\n"
+            
+            value = "self.LayerMonitorWidgetStorage"+str(self.LayerMonitorWidgetStorage)+"\n"
+            value += "self.model.layers"+ str(self.model.layers)+"\n"
             value += "self.model.structure"+str(self.model.structure)+"\n"
             value += "\n Layers:\n"
             for i in self.model.structure:
@@ -303,20 +602,22 @@ class GUI:
             value += "Dataset: "+ str(self.model.dataset)+"\n"
             self.LabelDEBUG["text"] = value
 
-
+        def TrainStatisticsUpadte(self):
+            try:
+                self.TrainStatisticsLabelTrain['text'] = "Minimum Train Error: "+str(np.min(self.modelEvaluationTrain))+\
+                    "\nAverage Train Error: "+str(np.average(self.modelEvaluationTrain))+"\nMaximum Train Error: "+str(np.max(self.modelEvaluationTrain))
+                self.TrainStatisticsLabelTest['text'] = "Minimum Train Error: "+str(np.min(self.modelEvaluationTrain))+\
+                "\nAverage Train Error: "+str(np.average(self.modelEvaluationTrain))+"\nMaximum Train Error: "+str(np.max(self.modelEvaluationTrain))
+            except AttributeError as ex:
+                pass
         #####
         def TrainStatistics(self):
 
-            if False and DEBUG :
-                self.modelEvaluationTrain = np.linspace(0,1,100)
-                self.modelEvaluationTest = np.linspace(-1,3,100)
-            
-
-            
             if self.modelEvaluationTest is None or len(self.modelEvaluationTest) == 0 or self.modelEvaluationTrain is  None or len(self.modelEvaluationTrain) == 0:
                 tkmsg.showinfo("Cannot calculate statistics","Model is not trained or initailized, so it's imposible to calculate values and make charts!")
                 return
             self.TrainStatisticsTopLevel = tk.Toplevel()
+            self.TrainStatisticsTopLevel.title('Train Statistics')
             
             temp_row=1
             self.TrainStatisticsLabelMainText = tk.Label(self.TrainStatisticsTopLevel,text = "Basic statistics form network training:")
@@ -339,16 +640,13 @@ class GUI:
             self.TrainStatisticsButtonErrorPlotShow.grid(column=1,row=temp_row)
             temp_row+=1
 
-            del(temp_row)
-
-
-           
-
             
 
         def ErrorPlotShow(self):
             plt.plot(self.modelEvaluationTrain)
             plt.plot(self.modelEvaluationTest)
+            plt.ylabel( "Error")
+            plt.xlabel("Epoch")
             plt.show()
 
         def ArffDataFormatInport(self,filename,Nendo:int=1):
@@ -447,6 +745,7 @@ class GUI:
 
         def CreateNewLayer(self):
             self.CreateNewLayerTopLevel = tk.Toplevel()
+            self.CreateNewLayerTopLevel.title('Create New Layer')
             # self.CreateNewLayerTopLevel.geometry("400x150")
 
 
@@ -510,48 +809,7 @@ class GUI:
             self.modelEvaluationTest.append(float(wholeError_test))
 
 
-        def TrainNetwork(self):
-            ok=True
-
-
-            if not self.DataFormatOk:
-                if len(self.model.structure) == 0:
-                    return
-                for y in ['train','test']:
-                    shape =  self.model.structure[0].matrix.shape[0]
-                    for i in self.model.dataset[y]['egzo']:
-                        if len(i)!=shape:
-                            ok=False
-                            break
-                    if not ok:
-                        break
-
-
-            if not self.DataFormatOk and ok:
-                for y in ['train','test']:
-                    shape =  self.model.structure[-1].matrix.shape[-1]
-                    for i in self.model.dataset[y]['endo']:
-                        if len(i)!=shape:
-                            ok=False
-                            break
-                    if not ok:
-                        break
-
-
-            if not ok:
-                tkmsg.showerror("Data and structure", "Dimentions of data and network don't match!")
-                return
-            else:
-                self.DataFormatOk = True
-            self.modelEvaluationTrain = []
-            self.modelEvaluationTest = []
-            if len(self.model.structure) == 0 or self.model.dataset ==None or self.model.dataset=={} or (not "train" in self.model.dataset.keys()) or (not "train" in self.model.dataset.keys()):
-                tkmsg.showerror("Uninitialized Network", "Please make sure the dataset is imported and network is compiled!")
-                return 
-            self.model.setExternalMonitor(self.TrainNetworkMonitor)
-            # TODO add including monitor
-            self.model.train()
-            tkmsg.showinfo("Model Trained!","Model is trained!")
+   
             
 
 
@@ -561,11 +819,14 @@ class GUI:
                 return
             self.model.compileModel()
             self.Update()
+            self.modelEvaluationTrain = []
+            self.modelEvaluationTest = []
             # if DEBUG:
             tkmsg.showinfo("compiled!","Model was compiled!")
+            
         def Settings(self):
             self.SettingsTopLevel = tk.Toplevel()
-            
+            self.SettingsTopLevel.title('Setting')
             self.SettingsLabelMainText = tk.Label(self.SettingsTopLevel,text = "Settings: ")
             self.SettingsLabelMainText.grid(row=1,column=1,sticky="W", columnspan=2)
 
@@ -574,23 +835,32 @@ class GUI:
             self.SettingsCheckBoxBiasVar.set(1 if self.ModelBiasState else 0)
             
             self.SettingsCheckBoxBias = tk.Checkbutton(self.SettingsTopLevel, text='use Bias',variable=self.SettingsCheckBoxBiasVar, onvalue=1, offvalue=0)
-            self.SettingsCheckBoxBias.grid(row=2,column=1,sticky="W")
+            self.SettingsCheckBoxBias.grid(row=9,column=1,sticky="W",columnspan=2)
 
             #learning factor
             self.SettingsLearningFactorLabel = tk.Label(self.SettingsTopLevel,text="Learning Factor")
-            self.SettingsLearningFactorLabel.grid(row=3,column=1)
+            self.SettingsLearningFactorLabel.grid(row=3,column=1,columnspan=2)
 
             self.SettingsLearningFactorEntry = tk.Entry(self.SettingsTopLevel)
             self.SettingsLearningFactorEntry.insert(0, str(self.model.learningFactor))
-            self.SettingsLearningFactorEntry.grid(row=4,column=1)
+            self.SettingsLearningFactorEntry.grid(row=4,column=1,columnspan=2)
             
             #iterations
             self.SettingsIterationsLabel = tk.Label(self.SettingsTopLevel,text="Iterations: ")
-            self.SettingsIterationsLabel.grid(row=5,column=1)
+            self.SettingsIterationsLabel.grid(row=5,column=1,columnspan=2)
 
             self.SettingsIterationsEntry = tk.Entry(self.SettingsTopLevel, width = 20)
             self.SettingsIterationsEntry.insert( 0, str(self.model.iterations))
-            self.SettingsIterationsEntry.grid(row=6,column=1)
+            self.SettingsIterationsEntry.grid(row=6,column=1,columnspan=2)
+
+
+            #ErrorCondition
+            self.SettingsErrorStopLabel = tk.Label(self.SettingsTopLevel,text="Error value to stop: ")
+            self.SettingsErrorStopLabel.grid(row=7,column=1,columnspan=2)
+
+            self.SettingsErrorStopEntry = tk.Entry(self.SettingsTopLevel, width = 20)
+            self.SettingsErrorStopEntry.insert( 0, str(self.model.errorValue))
+            self.SettingsErrorStopEntry.grid(row=8,column=1,columnspan=2)
 
 
 
@@ -621,6 +891,15 @@ class GUI:
             except Exception as ex:
                 tkmsg.showerror("Wrong learning factor","Wrong learning factor! Please pass correct number!")
                 return
+            errorValue = self.SettingsErrorStopEntry.get()
+            try:
+                errorValue = float(errorValue)
+                if errorValue <0:
+                    raise Exception()
+            except Exception as ex:
+                tkmsg.showerror("Wrong Error Value","Wrong Error Value! Please pass correct number!")
+                return
+
 
 
             if self.SettingsCheckBoxBiasVar.get()==1:
@@ -629,7 +908,7 @@ class GUI:
                 self.ModelBiasState = False
             self.model.iterations = iterations
             self.model.learningFactor = learningRate
-
+            self.model.errorValue = errorValue
             self.model.biasState = self.ModelBiasState
             self.SettingsTopLevel.destroy()
 
@@ -640,6 +919,7 @@ class GUI:
     
     def __init__(self):
         self.mainWindowO = self.MainWindowC()
+
 class NumpyArrayEncoder(JSONEncoder):
     def default(self, obj):
         print(type(obj))
@@ -650,46 +930,4 @@ class NumpyArrayEncoder(JSONEncoder):
 if __name__ == "__main__":
     GUI()
 
-                    
-'''                   
-
-    
-    performance = []
-    model = Model()
-
-    model.addLayer(4,ActivationFunctions.bipolar)
-    model.addLayer(4,ActivationFunctions.bipolar)
-    model.addLayer(1,ActivationFunctions.bipolar)
-
-
-    model.compileModel()
-
-    train_dataset= {
-        'egzo': np.array([[1,1,0,0],[1,0,0,0],[1,1,1,1]]), 
-        'endo':np.array([ [1],      [0],      [0.5]])
-    }
-
-
-    model.upload_train_dataset(train_dataset)
-    print(model.forward([1,0,0,0]))
-    print(model.forward([1,1,0,0]))
-    print(model.forward([1,1,1,1]))
-
-    one=model.train()
-    one
-
-
-    print("0         ",model.forward([1,0,0,0]))
-    print("1         ",model.forward([1,1,0,0]))
-    print("0.5       ",model.forward([1,1,1,1]),end="\n\n")
-    print("evaluate: ",model.evaluate())
-
-
-    import matplotlib.pyplot as plt
-    plt.plot(performance)
-    plt.show()
-    np.min(performance)
-
-
-
-'''
+     
