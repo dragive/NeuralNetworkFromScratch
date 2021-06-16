@@ -1,6 +1,6 @@
 from os import name
-from tkinter.constants import BOTTOM, W, X
-from typing import AsyncContextManager
+from tkinter.constants import BOTTOM
+
 import numpy as np
 import numpy
 from json import JSONEncoder
@@ -66,14 +66,14 @@ class GUI:
             
         def GenerateNotCompiledStructureWidget(self):
             self.TopLabelFrameNotCompiled = tk.LabelFrame(self.topFrame,text="Not-Compiled Structure of the Network")
-            self.TopLabelFrameNotCompiled.grid(column=0,columnspan=300,row=3,rowspan=1,sticky='nswe')
+            self.TopLabelFrameNotCompiled.grid(column=0,columnspan=300,row=3,rowspan=1,sticky='nswe',pady=10,padx=5)
             
             self.TopLabelFrameNotCompiledLabelStructure = tk.Label(self.TopLabelFrameNotCompiled,text = "[Input Layer] [Output Layer]")
-            self.TopLabelFrameNotCompiledLabelStructure.grid(row=10,column=10,columnspan=200)
+            self.TopLabelFrameNotCompiledLabelStructure.grid(row=10,column=10,columnspan=200,padx=5,pady=5)
 
 
             self.TopLabelFrameNotCompiledButtonClear = tk.Button(self.TopLabelFrameNotCompiled,text = "Clear Structure", command=self.ModelClearLayers)
-            self.TopLabelFrameNotCompiledButtonClear.grid(row=5,column=10,sticky='nsw')
+            self.TopLabelFrameNotCompiledButtonClear.grid(row=5,column=10,sticky='nsw',pady=5,padx=5)
 
             self.UpdateNotCompiledStructureWidget()
         def Update(self):
@@ -94,7 +94,7 @@ class GUI:
         def GenerateCompiledStructureWidget(self):
             
             self.TopLabelFrameCompiled = tk.LabelFrame(self.topFrame,text="Compiled Structure of the Network",padx=30,pady=12)
-            self.TopLabelFrameCompiled.grid(column=0,columnspan=300,row=4,rowspan=256,sticky='nswe')
+            self.TopLabelFrameCompiled.grid(column=0,columnspan=300,row=4,rowspan=256,sticky='nswe',pady=10,padx=5)
             self.UpdateCompiledStructureWidgetEmpty()
 
             
@@ -165,7 +165,11 @@ class GUI:
                                         for i,b,d,z in zip(self.model.structure[number].matrix.tolist(),self.model.structure[number].bias.tolist(),\
                                             self.model.structure[number].dot.tolist(),self.model.structure[number].output.tolist())]
                     )
-                text +='\n'
+                try:
+                    self.model.structure[0].input = [float(iii) for iii in self.model.structure[0].input]
+                except Exception as ex:
+                    pass
+                text +='\n\n\n'
                 if not (self.model.structure[number].input is None or len(self.model.structure[number].input)==1000):
                     text+='Input: '+', '.join([f'{foo :7.4}' for foo in self.model.structure[number].input])+'\n'
                 
@@ -253,8 +257,8 @@ class GUI:
             temp_col+=1
 
             self.buttonTrainNetwork = tk.Button(self.topFrame, text="Train Network", command= self.TrainNetwork)
-            self.buttonTrainNetwork.grid(row=row,column=temp_col,padx=padx,sticky='nswe',columnspan=2)
-            temp_col+=2
+            self.buttonTrainNetwork.grid(row=row,column=temp_col,padx=padx,sticky='nswe',columnspan=1)
+            temp_col+=1
 
             self.buttonExportNetworkFromFile = tk.Button(self.topFrame, text="Export Network To File",command=self.ExportNetworkToFile)
             self.buttonExportNetworkFromFile.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
@@ -273,10 +277,9 @@ class GUI:
             self.buttonTrainStatistics.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
             temp_col+=1
 
-
-            self.buttonStep = tk.Button(self.topFrame, text="One Epoch",command=self.Step)
-            self.buttonStep.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
-            temp_col+=1
+            # self.buttonStep = tk.Button(self.topFrame, text="One Epoch",command=self.Step)
+            # self.buttonStep.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
+            # temp_col+=1
 
             self.buttonOneStep = tk.Button(self.topFrame, text="One Iteration",command=self.OneStep)
             self.buttonOneStep.grid(row=row,column=temp_col,padx=padx,sticky='nswe')
@@ -307,17 +310,65 @@ class GUI:
             self.DataManagerTopLevel = tk.Toplevel()
             self.DataManagerTopLevel.title('Data Manager')
             self.DataManagerImportData = tk.Button(self.DataManagerTopLevel, text="Import From File",command = self.DataManagerImport)
-            self.DataManagerImportData.grid(row=1,column=1,columnspan=3)
+            self.DataManagerImportData.grid(row=1000,column=1)
+            self.DataManagerImportData = tk.Button(self.DataManagerTopLevel, text="Add Data Manualy",command = self.DataManagerAdd)
+            self.DataManagerImportData.grid(row=1000,column=2)
             
 
-            index = 0
-            self.DataManagerStorage = {}
+            
+            
             if self.model.dataset is None or self.model.dataset == {}:
-                tk.Label(self.DataManagerTopLevel, text="There's no data").grid(row=2,column=1,columnspan=2,pady=30,padx=30)
+                tk.Label(self.DataManagerTopLevel, text="There's no data").grid(row=2,column=1,columnspan=3,pady=30,padx=30)
                 return
-            tk.Label(self.DataManagerTopLevel, text="Check \"Train\" to include data to train datast").grid(row=2,column=1,columnspan=2,pady=20)
-            tk.Button(self.DataManagerTopLevel,text="Submit",command=self.DataManagerReadAndExit).grid(row=1000,column=1,columnspan=2)
+            tk.Label(self.DataManagerTopLevel, text="Check \"Train\" to include data to train dataset else to test dataset.").grid(row=2,column=1,columnspan=3,pady=20)
+            tk.Button(self.DataManagerTopLevel,text="Submit",command=self.DataManagerReadAndExit).grid(row=1000,column=3)
             # print(self.model.dataset)
+            self.DataManagerEditFrame=None
+            self.DataManagerEditUpdate()
+        def DataManagerAdd(self):
+            
+            index = 0
+            self.DataManagerAddTopLevel = tk.Toplevel()
+            self.DataManagerAddTopLevel.title('Add Data')
+            
+            self.DataManagerAddEntry=tk.Entry(self.DataManagerAddTopLevel,width = 40)
+            self.DataManagerAddEntry.grid(row=1,column=0,columnspan = 2)
+            value =' -> '
+            self.DataManagerAddEntry.insert(0,value)
+
+            self.DataManagerEditSubmitBTN = tk.Button(self.DataManagerAddTopLevel,text='Submit',command=self.DataManagerAddSubmit)
+            self.DataManagerEditSubmitBTN.grid(row=2,column=0)
+        def DataManagerAddSubmit(self):
+            value = self.DataManagerAddEntry.get()
+            if value == '':
+                
+                # self.DataManagerAddTopLevel[index].destroy()
+                return 
+            try:
+                egzo ,endo = value.split('->')
+                egzo = [float(i) for i in egzo.split(',')]
+                endo = [float(i) for i in endo.split(',')]
+                self.model.dataset['train']['egzo'].append(egzo)
+                self.model.dataset['train']['endo'].append(endo)
+
+            except Exception as ex:
+                print(ex)
+                tkmsg.showwarning("Data Edit Error","Error occured while editing dataset!")
+                return
+            # self.DataManagerReadAndExit(destroy=False)
+            self.DataManagerEditUpdate()
+            # self.DataManagerEditTopLevel[].destroy()
+        def DataManagerEditUpdate(self):
+            if self.DataManagerEditFrame is None:
+                self.DataManagerEditFrame = tk.Frame(self.DataManagerTopLevel)
+                self.DataManagerEditFrame.grid(row=3,column=1,columnspan=3)
+            else:
+                self.DataManagerEditFrame.destroy()
+                self.DataManagerEditFrame = tk.Frame(self.DataManagerTopLevel)
+                self.DataManagerEditFrame.grid(row=3,column=1)
+            self.DataManagerStorage = {}
+            
+            index = 0
             for part in ('train','test'):
                 for i in range(len(self.model.dataset[part]['egzo'])):
                     self.DataManagerStorage[index]={}
@@ -328,17 +379,66 @@ class GUI:
                     self.DataManagerStorage[index]['data']['egzo'] = self.model.dataset[part]['egzo'][i]
                     self.DataManagerStorage[index]['data']['endo'] = self.model.dataset[part]['endo'][i]
 
-                    self.DataManagerStorage[index]['checkbox'] = tk.Checkbutton(self.DataManagerTopLevel ,text=' Train ',variable=self.DataManagerStorage[index]['var'], onvalue='train', offvalue='test')
+                    self.DataManagerStorage[index]['checkbox'] = tk.Checkbutton(self.DataManagerEditFrame ,text=' Train ',variable=self.DataManagerStorage[index]['var'], onvalue='train', offvalue='test')
                     self.DataManagerStorage[index]['checkbox'].grid(row=index+3,column =1,pady=2)
                     # print(self.model.dataset[part]['egzo'][i])
                     text=', '.join([str(foo) for foo in self.model.dataset[part]['egzo'][i]])+' -> '+', '.join([str(foo) for foo in self.model.dataset[part]['endo'][i]])
                     
-                    self.DataManagerStorage[index]['label'] = tk.Label(self.DataManagerTopLevel,text =text)
+                    self.DataManagerStorage[index]['label'] = tk.Label(self.DataManagerEditFrame,text =text)
                     self.DataManagerStorage[index]['label'].grid(row=index+3,column =2,pady=2)
-
+                    self.DataManagerStorage[index]['editbtn'] = tk.Button(self.DataManagerEditFrame,text ="Edit",command = lambda index=index: self.DataManagerEdit(index))
+                    self.DataManagerStorage[index]['editbtn'].grid(row=index+3,column =3,pady=2)
+                    self.DataManagerStorage[index]['delbtn'] = tk.Button(self.DataManagerEditFrame,text='Delete',command=lambda inde = index :self.DataManagerDeleteSubmit(inde))
+                    self.DataManagerStorage[index]['delbtn'].grid(row=index+3,column=4)
                     index +=1
             self.DataManagerStorage['index']=index
-        def DataManagerReadAndExit(self):
+
+        def DataManagerEdit(self,index):
+            self.DataManagerEditTopLevel={}
+            self.DataManagerEditTopLevel[index] = tk.Toplevel()
+            self.DataManagerEditTopLevel[index].title('Edit Data')
+            self.DataManagerEditEntry={}
+            self.DataManagerEditEntry[index]=tk.Entry(self.DataManagerEditTopLevel[index],width = 40)
+            self.DataManagerEditEntry[index].grid(row=1,column=0,columnspan = 2)
+            value = ', '.join([str(foo) for foo in self.DataManagerStorage[index]['data']['egzo'] ]) + \
+                ' -> '+\
+                    ', '.join([str(foo) for foo in self.DataManagerStorage[index]['data']['endo'] ])
+            self.DataManagerEditEntry[index].insert(0,value)
+            self.DataManagerEditSubmitBTN={}
+            self.DataManagerEditSubmitDEL={}
+            self.DataManagerEditSubmitBTN[index] = tk.Button(self.DataManagerEditTopLevel[index],text='Submit',command=lambda index = index :self.DataManagerEditSubmit(index))
+            self.DataManagerEditSubmitBTN[index].grid(row=2,column=0)
+
+        def DataManagerDeleteSubmit(self,index):
+            del(self.DataManagerStorage[index])
+            print(self.DataManagerStorage.keys(),index)
+            self.DataManagerReadAndExit(destroy=False)
+            self.DataManagerEditUpdate()
+
+        def DataManagerEditSubmit(self,index):
+            value = self.DataManagerEditEntry[index].get()
+            if value == '':
+                del(self.DataManagerStorage[index])
+                self.DataManagerEditTopLevel[index].destroy()
+                return 
+            try:
+                egzo ,endo = value.split('->')
+                egzo = [float(i) for i in egzo.split(',')]
+                endo = [float(i) for i in endo.split(',')]
+                self.DataManagerStorage[index]['data']['egzo'] = egzo
+                self.DataManagerStorage[index]['data']['endo'] = endo
+
+            except:
+                tkmsg.showwarning("Data Edit Error","Error occured while editing dataset!")
+                return
+            self.DataManagerReadAndExit(destroy=False)
+            self.DataManagerEditUpdate()
+            self.DataManagerEditTopLevel[index].destroy()
+            # self.DataManagerTopLevel.destroy()
+
+            
+
+        def DataManagerReadAndExit(self,destroy=True):
             self.model.dataset={
                 'train':{
                     'egzo':[],
@@ -349,14 +449,20 @@ class GUI:
                     'endo':[]
                 }
             }
-            for index in range(self.DataManagerStorage['index']):
+            for index in self.DataManagerStorage.keys():
+                if index == 'index':
+                    continue
+                place = self.DataManagerStorage[index]['var'].get()
+                egzo = self.DataManagerStorage[index]['data']['egzo']
+                endo =  self.DataManagerStorage[index]['data']['endo']
                 self.model.dataset[
-                    self.DataManagerStorage[index]['var'].get()
-                ]['egzo'].append(self.DataManagerStorage[index]['data']['egzo'])
+                    place
+                ]['egzo'].append(egzo)
                 self.model.dataset[
-                    self.DataManagerStorage[index]['var'].get()
-                ]['endo'].append(self.DataManagerStorage[index]['data']['endo'])
-            self.DataManagerTopLevel.destroy()
+                    place
+                ]['endo'].append(endo)
+            if destroy:
+                self.DataManagerTopLevel.destroy()
         def TrainNetwork(self):
             
             ok=True
@@ -590,17 +696,17 @@ class GUI:
                 return
 
 
-        def DEBUG_helper(self):
+        # def DEBUG_helper(self):
             
-            value = "self.LayerMonitorWidgetStorage"+str(self.LayerMonitorWidgetStorage)+"\n"
-            value += "self.model.layers"+ str(self.model.layers)+"\n"
-            value += "self.model.structure"+str(self.model.structure)+"\n"
-            value += "\n Layers:\n"
-            for i in self.model.structure:
-                value += str(i.matrix.shape)+"\n"
+        #     value = "self.LayerMonitorWidgetStorage"+str(self.LayerMonitorWidgetStorage)+"\n"
+        #     value += "self.model.layers"+ str(self.model.layers)+"\n"
+        #     value += "self.model.structure"+str(self.model.structure)+"\n"
+        #     value += "\n Layers:\n"
+        #     for i in self.model.structure:
+        #         value += str(i.matrix.shape)+"\n"
 
-            value += "Dataset: "+ str(self.model.dataset)+"\n"
-            self.LabelDEBUG["text"] = value
+        #     value += "Dataset: "+ str(self.model.dataset)+"\n"
+        #     self.LabelDEBUG["text"] = value
 
         def TrainStatisticsUpadte(self):
             try:

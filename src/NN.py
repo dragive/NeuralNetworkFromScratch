@@ -115,7 +115,8 @@ class Layer:
             self.dot = temp.copy()
 
 #             print(self.dot,"####",)
-        self.output = function(self.dot)
+        self.output = function(self.dot).copy()
+        # print('output',self.output)
         return self.output.copy()
    
 class Model:
@@ -124,7 +125,10 @@ class Model:
         self.layers=[] # tymczasowe wartości, które potem są wykorzystywne do kompilacji modelu
         self.structure=[] # zbiór obiektów Layer
         self.learningFactor=0.2
-        self.dataset={}
+        self.dataset={
+            'train':{'egzo':[],'endo':[]},
+            'test':{'egzo':[],'endo':[]},
+        }
         self.loss_v=None
         self.iterations = 100
         self.biasState = True
@@ -143,7 +147,7 @@ class Model:
 
         ret['biasState'] = self.biasState
         ret['iterations'] = self.iterations
-        print(ret)
+        # print(ret)
         
         return ret
 
@@ -176,8 +180,8 @@ class Model:
         assert len(self.structure) >=1
         output = data
         for i in self.structure:
-            output = i.forward(output,biasState=self.biasState)#.copy()
-        return output#.copy()
+            output = i.forward(output,biasState=self.biasState).copy()
+        return output.copy()
     
     def upload_test_dataset(self,data): #TODO add validation
         self.dataset['test'] = data
@@ -253,10 +257,12 @@ class Model:
                     self.structure[i].matrix = self.structure[i].matrix - np.multiply(self.learningFactor,nabla_w[i])
                     if self.biasState: 
                         self.structure[i].bias = self.structure[i].bias + self.learningFactor*nabla_b[i]
+            
             perform_train = self.evaluate()
             perform_test = self.evaluate_test()
             
             self.internalMonitor(counter,perform_train,perform_test,(nabla_w.copy(),nabla_b.copy()))
+            
             if perform_train <=self.errorValue:
                 return
     def Step(self):
@@ -272,11 +278,12 @@ class Model:
         perform_train = self.evaluate()
         perform_test = self.evaluate_test()
         
+        
         self.internalMonitor(1,perform_train,perform_test,(nabla_w.copy(),nabla_b.copy()))
     def OneStep(self):
-        
-        x,y=zip(self.dataset['train']['egzo'],self.dataset['train']['endo'][self.OneStepStorage])
-
+       
+        x,y=self.dataset['train']['egzo'][self.OneStepStorage],self.dataset['train']['endo'][self.OneStepStorage]
+        # print('x,y',x,y)
         nabla_w, nabla_b = self.SGD(x,y)
 
         for i  in range(len(self.structure)):
@@ -288,7 +295,10 @@ class Model:
         perform_test = self.evaluate_test()
         
         self.internalMonitor(1,perform_train,perform_test,(nabla_w.copy(),nabla_b.copy()))
+        self.forward(x)
         self.OneStepStorage+=1
+        self.OneStepStorage %= len(self.dataset['train']['egzo'])
+
     
     def setExternalMonitor(self, monitor=None):
         if not monitor == None:
