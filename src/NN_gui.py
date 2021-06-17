@@ -372,7 +372,7 @@ class GUI:
             else:
                 self.DataManagerEditFrame.destroy()
                 self.DataManagerEditFrame = tk.Frame(self.DataManagerTopLevel)
-                self.DataManagerEditFrame.grid(row=3,column=1)
+                self.DataManagerEditFrame.grid(row=3,column=1,columnspan=3)
             self.DataManagerStorage = {}
             
             index = 0
