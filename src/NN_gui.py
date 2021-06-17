@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 from os import name
 from tkinter.constants import BOTTOM
 
@@ -17,7 +18,7 @@ import matplotlib.pyplot as plt
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 
 import re
-
+import os
 
 
 DEBUG = False
@@ -27,6 +28,12 @@ class GUI:
     class MainWindowC:
         def __init__(self):
             self.main = tk.Tk()
+
+            try:
+                self.main.tk.call('wm', 'iconphoto', self.main._w, tk.PhotoImage(file=os.path.realpath('ico.png')))
+            except Exception as ex:
+                pass
+
             self.main.title("Neural Networks From Scratch")
             self.model = Model()
             self.ModelBiasState = True
