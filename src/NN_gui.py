@@ -8,7 +8,7 @@ import copy
 from numpy.lib.shape_base import column_stack
 
 from numpy.random import default_rng
-from NN import *
+from NN_model import *
 import json
 import tkinter as tk
 import tkinter.messagebox as tkmsg
