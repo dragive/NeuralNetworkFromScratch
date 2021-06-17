@@ -149,7 +149,7 @@ class GUI:
                 text = ''
                 if self.model.biasState:
                     text=  '\n '.join(
-                    [' a = '+' + '.join(
+                    [' LC = '+' + '.join(
                                 [f'({y:7.4}*x{z+1})' for z,y in enumerate(i)]
                                 )
                                     + f' + ( {b :7.4} ) '# = {d :7.4} -> f(a) =  {z :7.4}' 
