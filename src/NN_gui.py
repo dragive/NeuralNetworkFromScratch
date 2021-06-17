@@ -318,7 +318,7 @@ class GUI:
             self.DataManagerTopLevel.title('Data Manager')
             self.DataManagerImportData = tk.Button(self.DataManagerTopLevel, text="Import From File",command = self.DataManagerImport)
             self.DataManagerImportData.grid(row=1000,column=1)
-            self.DataManagerImportData = tk.Button(self.DataManagerTopLevel, text="Add Data Manualy",command = self.DataManagerAdd)
+            self.DataManagerImportData = tk.Button(self.DataManagerTopLevel, text="Add Data Manually",command = self.DataManagerAdd)
             self.DataManagerImportData.grid(row=1000,column=2)
             
 
@@ -678,7 +678,7 @@ class GUI:
             self.EvaluateLabelOutput = tk.Label(self.EvaluateTopLevel,text = "\nYour network output: \n")
             self.EvaluateLabelOutput.grid(row=3,column=0,columnspan=2)
             
-            self.EvaluateButtonCancel = tk.Button(self.EvaluateTopLevel,text="Close Window",command=self.EvaluateTopLevel.destroy)
+            self.EvaluateButtonCancel = tk.Button(self.EvaluateTopLevel,text="Cancel",command=self.EvaluateTopLevel.destroy)
             self.EvaluateButtonCancel.grid(row=30,column=0 )
                         #TODO
             self.EvaluateButtonSubmit = tk.Button(self.EvaluateTopLevel,text="Submit",command=self.EvaluateReadAndForward)
@@ -756,10 +756,11 @@ class GUI:
             
 
         def ErrorPlotShow(self):
-            plt.plot(self.modelEvaluationTrain)
-            plt.plot(self.modelEvaluationTest)
+            plt.plot(self.modelEvaluationTrain,label = "Train")
+            plt.plot(self.modelEvaluationTest,label = "Test")
             plt.ylabel( "Error")
             plt.xlabel("Epoch")
+            plt.legend()
             plt.show()
 
         def ArffDataFormatInport(self,filename,Nendo:int=1):
@@ -864,13 +865,13 @@ class GUI:
 
 
             self.CreateNewLayerLabelNumberOfNeurons = tk.Label(self.CreateNewLayerTopLevel,text="Number of neurons: ")
-            self.CreateNewLayerLabelNumberOfNeurons.config(font=("FreeSans",16))
+            # self.CreateNewLayerLabelNumberOfNeurons.config()
             self.CreateNewLayerLabelNumberOfNeurons.grid(row=1,column=1, columnspan=2)
 
 
             #entry
 
-            self.CreateNewLayerInputNumberOfNeurons = tk.Entry(self.CreateNewLayerTopLevel,width=20)
+            self.CreateNewLayerInputNumberOfNeurons = tk.Entry(self.CreateNewLayerTopLevel,width=40)
             self.CreateNewLayerInputNumberOfNeurons.grid(row=2,column=1, columnspan=2)
 
 
@@ -878,11 +879,11 @@ class GUI:
             self.CreateNewLayerActivationFuncitonVariable=tk.IntVar()
             self.CreateNewLayerActivationFuncitonVariable.set(1)
 
-            self.CreateNewLayerRadioButtonUnipolar = tk.Radiobutton(self.CreateNewLayerTopLevel, text="Sigmoid (Unipolar)",variable = self.CreateNewLayerActivationFuncitonVariable, value=1)
+            self.CreateNewLayerRadioButtonUnipolar = tk.Radiobutton(self.CreateNewLayerTopLevel, text="Unipolar",variable = self.CreateNewLayerActivationFuncitonVariable, value=1)
             self.CreateNewLayerRadioButtonUnipolar.grid(row=3,column=1, columnspan=2, sticky="W")
 
 
-            self.CreateNewLayerRadioButtonBipolar = tk.Radiobutton(self.CreateNewLayerTopLevel, text="ArcTG (Bipolar)",variable = self.CreateNewLayerActivationFuncitonVariable, value=2)
+            self.CreateNewLayerRadioButtonBipolar = tk.Radiobutton(self.CreateNewLayerTopLevel, text="Bipolar",variable = self.CreateNewLayerActivationFuncitonVariable, value=2)
             self.CreateNewLayerRadioButtonBipolar.grid(row=4,column=1, columnspan=2, sticky="W")
 
 
@@ -898,8 +899,8 @@ class GUI:
         def CreateNewLayerReadFieldsAndExit(self):
             #validate input, raise messagebox to warn user to type correct input
             temp_AF = self.CreateNewLayerActivationFuncitonVariable.get() 
-            print("activaton: ",self.CreateNewLayerActivationFuncitonVariable.get())
-            print("Number of neurons",self.CreateNewLayerInputNumberOfNeurons.get())
+            # print("activaton: ",self.CreateNewLayerActivationFuncitonVariable.get())
+            # print("Number of neurons",self.CreateNewLayerInputNumberOfNeurons.get())
             try:
                 self.CreateNewLayerNumberOfNeurons = int(self.CreateNewLayerInputNumberOfNeurons.get())
                 assert self.CreateNewLayerNumberOfNeurons >=1
@@ -939,7 +940,7 @@ class GUI:
             
         def Settings(self):
             self.SettingsTopLevel = tk.Toplevel()
-            self.SettingsTopLevel.title('Setting')
+            self.SettingsTopLevel.title('Settings')
             self.SettingsLabelMainText = tk.Label(self.SettingsTopLevel,text = "Settings: ")
             self.SettingsLabelMainText.grid(row=1,column=1,sticky="W", columnspan=2)
 
